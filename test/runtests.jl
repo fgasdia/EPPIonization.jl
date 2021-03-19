@@ -22,4 +22,6 @@ using DelimitedFiles
 
     mion = readdlm("example_ionpro.txt", ',')
     @test mion[:,2] ≈ ion
+
+    @test_throws ArgumentError ionprofile(atom[:,1], energy, energydis, pitchangle, pitchdis, atom[1:10,2])
 end

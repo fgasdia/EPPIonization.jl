@@ -30,13 +30,13 @@ Compute ionization profile as a function of `altitude` in km.
     - `energydis`: energy distribution of precipitating electrons
     - `pitchangle` [deg]: pitch angle between 0 and 90°
     - `pitchdis`: pitch angle distribution
-    - `massdensity` [g/cm²]: mass density versus `altitude` in new atmosphere
+    - `massdensity` [g/cm²]: mass density in new atmosphere defined from 0:500 km.
 
 # Example
 
 ```julia
 energy = 10.^(4:0.01:7);
-energydis = exp.(-energy/1e5);  # f(E)∝exp(-E/100 keV)
+energydis = exp.(-energy/1e5);  # f(E) ∝ exp(-E/100 keV)
 pitchangle = 0:90;
 pitchdis = ones(length(pitchangle));
 ion = ionprofile(alt, energy, energydis, pitchangle, pitchdis, massdensity)
@@ -44,6 +44,12 @@ ion = ionprofile(alt, energy, energydis, pitchangle, pitchdis, massdensity)
 """
 function ionprofile(altitude, energy, energydis, pitchangle, pitchdis, massdensity)
     en, pa, ion, masden, alt = readlut()
+
+    # Mask values up to maximum of `altitude`
+    mask = alt .<= maximum(altitude)
+    alt = alt[mask]
+    masden = masden[mask]
+    ion = ion[:,:,mask]
     
     # calculate energy bins
     edge = Vector{Float64}(undef, length(en)+1)
@@ -105,6 +111,7 @@ function lookupconvert(denold1, ionold1, dennew1, alt)
     if count(>(0), ionold1) < 2 || sum(ionold1) == 1
         return ionold1
     end
+    length(dennew1) == length(alt) || throw(ArgumentError("`dennew1` must be length $(length(alt))"))
 
     # TODO: we can precompute some of the values in this function
 
