@@ -21,25 +21,29 @@ end
 """
     ionprofile(altitude, energy, energydis, pitchangle, pitchdis, massdensity)
 
-Compute ionization profile as a function of `altitude` in km.
+Compute ionization rate profile in pairs/el/cm as a function of `altitude` in km.
+
+To compute the ionization in pairs/cm³/s, multiply the output of this function by the
+source precipitating electron flux in el/cm²/s.
 
 # Arguments
 
     - `altitude` [km]: altitude vector
-    - `energy` [keV]: electron energy between ~3 keV and ~33 MeV
+    - `energy` [eV]: electron energy between ~3 keV and ~33 MeV
     - `energydis`: energy distribution of precipitating electrons
     - `pitchangle` [deg]: pitch angle between 0 and 90°
     - `pitchdis`: pitch angle distribution
-    - `massdensity` [g/cm²]: mass density in new atmosphere defined from 0:500 km.
+    - `massdensity` [g/cm³/1000]: mass density in new atmosphere in g/cm³ divided by 1000
+        defined at each element of `altitude`
 
 # Example
 
 ```julia
 energy = 10.^(4:0.01:7);
-energydis = exp.(-energy/1e5);  # f(E) ∝ exp(-E/100 keV)
+energydis = exp.(-energy/1e5);  # e.g.: f(E) ∝ exp(-E/100 keV)
 pitchangle = 0:90;
 pitchdis = ones(length(pitchangle));
-ion = ionprofile(alt, energy, energydis, pitchangle, pitchdis, massdensity)
+ion = ionprofile(alt, energy, energydis, pitchangle, pitchdis, massdensity);
 ```
 """
 function ionprofile(altitude, energy, energydis, pitchangle, pitchdis, massdensity)
