@@ -1,9 +1,13 @@
 module EPPIonization
 
-using Interpolations
-using HDF5
+using Dates
+using Interpolations, HDF5, TypedTables
+using SatelliteToolbox
+using GPI, FIRITools, LMPTools
 
-export ionprofile
+export ionprofile, neutralprofiles, chargeprofiles
+
+const INITIALIZED = Ref{Bool}(false)
 
 datadir(f) = joinpath(@__DIR__, "..", "data", f)
 
@@ -183,4 +187,90 @@ function lookupconvert(denold1, ionold1, dennew1, alt)
     return reverse!(ionnew)  # back to alt order
 end
 
+"""
+    massdensity(p, z)
+
+Return total neutral atmosphere mass density in g/cm³ at altitude `z` in km.
+"""
+function massdensity(p, z)
+    # mass = number density [#/m³] * molecular mass [g/mol] * [1 mol/#] * [m³/cm³]
+    NA = 6.0221e23
+    mN2 = GPI.getspecies(p, :N2, z)*28.014
+    mO2 = GPI.getspecies(p, :O2, z)*31.999
+    mO = GPI.getspecies(p, :O, z)*15.999
+    m = (mN2 + mO2 + mO)/NA*1e-6
+    
+    return m
+end
+
+"""
+    neutralprofiles(lat, lon, z, dt::DateTime)
+
+Return `Table` of neutral atmosphere profiles and a boolean value if the `lat`, `lon` (deg)
+and UTC time `dt` is daytime. The profiles will be evaluated at heights `z` in km.
+"""
+function neutralprofiles(lat, lon, z, dt::DateTime)
+    if !INITIALIZED[]
+        init_space_indices(enabled_files=[:fluxtable, :wdcfiles],
+            fluxtable_force_download=false, wdcfiles_force_download=false)
+        INITIALIZED[] = true
+    end
+
+    lon = mod(lon, 360)
+
+    jd = DatetoJD(dt)
+    sza = zenithangle(lat, lon, dt)
+    
+    g_lat = deg2rad(lat)
+    g_lon = deg2rad(lon)
+    
+    h = z.*1000  # m
+    p = nrlmsise00.(jd, h, g_lat, g_lon; output_si=true, dversion=false)  # #/m³
+    
+    f107 = get_space_index(F10M(), jd)  # 81 day average. Doesn't match online exactly.
+    nearest_f107 = FIRITools.values(:f10_7)[argmin(abs.(f107 .- FIRITools.values(:f10_7)))]
+
+    Ne0 = firi(sza, lat; f10_7=nearest_f107, month=month(dt))
+    Ne = FIRITools.extrapolate(Ne0, h)
+    # With specified f10_7 and month, there is only 1 profile after interpolation
+    
+    df = Table(
+        h  = collect(z),
+        Ne = Ne,
+        Tn = getfield.(p, :T_alt),
+        O  = getfield.(p, :den_O),
+        N2 = getfield.(p, :den_N2),
+        O2 = getfield.(p, :den_O2)
+    )
+    
+    return df, isday(sza)
+end
+
+"""
+    chargeprofiles(flux, lat, lon, z, dt::DateTime)
+    chargeprofiles(flux, neutraltable, z, daytime::Bool)
+
+Compute GPI background and EPP-perturbed profiles for precipitating electron `flux` in
+el/cm²/s, `lat` and `lon` in degrees, heights `z`, and time `dt`.
+"""
+function chargeprofiles(flux, neutraltable, z, daytime::Bool)
+    energy = 90e3:0.01:2.2e6  # eV; 90 keV to 2.2 MeV
+    energydis = exp.(-energy/2e5)  # f(E) ∝ exp(-E/β) where β ranges from 100 to 300 keV
+    pitchangle = 0:90
+    pitchdis = ones(length(pitchangle))
+
+    md = massdensity.((neutraltable,), z)  # g/cm³
+    S = ionprofile(z, energy, energydis, pitchangle, pitchdis, md/1000)*1e6
+    S *= flux
+
+    Nspec0, Nspec = gpi(neutraltable, z, daytime, S)
+
+    return Nspec0, Nspec
+end
+
+function chargeprofiles(flux, lat, lon, z, dt::DateTime)
+    neutraltable, daytime = neutralprofiles(lat, lon, z, dt)
+    chargeprofiles(flux, neutraltable, z, daytime)
+end
+    
 end # module

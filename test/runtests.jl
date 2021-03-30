@@ -1,8 +1,8 @@
 using Test, EPPIonization
-using DelimitedFiles
+using DelimitedFiles, Dates
 
-@testset "EPPIonization" begin
-    ## Compare to Matlab
+
+function comparematlab()
     # electron energy
     energy = exp10.(4:0.01:7)
 
@@ -24,4 +24,26 @@ using DelimitedFiles
     @test mion[:,2] ≈ ion
 
     @test_throws ArgumentError ionprofile(atom[:,1], energy, energydis, pitchangle, pitchdis, atom[1:10,2])
+end
+
+function profiles()
+    z = 0:110
+    dt = DateTime(2020, 1, 1, 2, 30)
+    lat, lon = 60, 258
+    flux = 1e5
+
+    np, daytime = neutralprofiles(lat, lon, z, dt)
+
+    @test daytime == false
+
+    background1, perturbed1 = chargeprofiles(flux, lat, lon, z, dt)
+    background2, perturbed2 = chargeprofiles(flux, np, z, daytime)
+
+    @test background1 == background2
+    @test perturbed1 == perturbed2
+end
+
+@testset "EPPIonization" begin
+    comparematlab()
+    profiles()
 end
