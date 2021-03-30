@@ -58,11 +58,16 @@ function ionizationrateplot()
          xscale=:log10, ylims=(0, 205), xlims=(1e3, 1e9), legend=false)
 end
 
-function chargeprofileplot()
+function chargeprofileplot(daytime::Bool)
     z = 0:110
-    dt = DateTime(2020, 1, 1, 2, 30)
     lat, lon = 60, 258
     flux = 1e5
+
+    if daytime
+        dt = DateTime(2020, 1, 1, 18, 30)
+    else
+        dt = DateTime(2020, 1, 1, 2, 30)
+    end
 
     np, daytime = neutralprofiles(lat, lon, z, dt)
     cp0, cp = chargeprofiles(flux, np, z, daytime)
@@ -79,5 +84,4 @@ function chargeprofileplot()
     plot!(mask.(cp0), z, linestyle=:dash, linewidth=lws,
           color_palette=pal, labels=false)
     plot!(mask.(np.Ne), z, color="black", linewidth=2, linestyle=:dash, label="FIRI")
-    # savefig("gpiprofiles.png")
 end
