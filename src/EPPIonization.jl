@@ -5,8 +5,9 @@ using Interpolations, HDF5, TypedTables
 using SatelliteToolbox
 using GPI, FIRITools, LMPTools
 
-export ionprofile, neutralprofiles, chargeprofiles
+export ionizationprofile, neutralprofiles, chargeprofiles
 
+const SPECIES = GPI.SPECIES
 const INITIALIZED = Ref{Bool}(false)
 
 datadir(f) = joinpath(@__DIR__, "..", "data", f)
@@ -23,7 +24,7 @@ function readlut()
 end
 
 """
-    ionprofile(altitude, energy, energydis, pitchangle, pitchdis, massdensity)
+    ionizationprofile(altitude, energy, energydis, pitchangle, pitchdis, massdensity)
 
 Compute ionization rate profile in pairs/el/cm as a function of `altitude` in km.
 
@@ -47,10 +48,10 @@ energy = 10.^(4:0.01:7);
 energydis = exp.(-energy/1e5);  # e.g.: f(E) ∝ exp(-E/100 keV)
 pitchangle = 0:90;
 pitchdis = ones(length(pitchangle));
-ion = ionprofile(alt, energy, energydis, pitchangle, pitchdis, massdensity);
+ion = ionizationprofile(alt, energy, energydis, pitchangle, pitchdis, massdensity);
 ```
 """
-function ionprofile(altitude, energy, energydis, pitchangle, pitchdis, massdensity)
+function ionizationprofile(altitude, energy, energydis, pitchangle, pitchdis, massdensity)
     en, pa, ion, masden, alt = readlut()
 
     # Mask values up to maximum of `altitude`
@@ -260,7 +261,7 @@ function chargeprofiles(flux, neutraltable, z, daytime::Bool)
     pitchdis = ones(length(pitchangle))
 
     md = massdensity.((neutraltable,), z)  # g/cm³
-    S = ionprofile(z, energy, energydis, pitchangle, pitchdis, md/1000)*1e6
+    S = ionizationprofile(z, energy, energydis, pitchangle, pitchdis, md/1000)*1e6
     S *= flux
 
     Nspec0, Nspec = gpi(neutraltable, z, daytime, S)

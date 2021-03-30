@@ -1,6 +1,8 @@
 using Test, EPPIonization
 using DelimitedFiles, Dates
 
+using EPPIonization: datadir
+
 
 function comparematlab()
     # electron energy
@@ -16,14 +18,14 @@ function comparematlab()
     pitchdis = ones(length(pitchangle))
 
     # example atmosphere, first column: alt 0:500 km, second column: mass density (g/cm²)
-    atom = readdlm("example_atmosphere.txt")
+    atom = readdlm(datadir("example_atmosphere.txt"))
 
-    ion = ionprofile(atom[:,1], energy, energydis, pitchangle, pitchdis, atom[:,2])
+    ion = ionizationprofile(atom[:,1], energy, energydis, pitchangle, pitchdis, atom[:,2])
 
-    mion = readdlm("example_ionpro.txt", ',')
+    mion = readdlm(datadir("example_ionpro.txt"), ',')
     @test mion[:,2] ≈ ion
 
-    @test_throws ArgumentError ionprofile(atom[:,1], energy, energydis, pitchangle, pitchdis, atom[1:10,2])
+    @test_throws ArgumentError ionizationprofile(atom[:,1], energy, energydis, pitchangle, pitchdis, atom[1:10,2])
 end
 
 function profiles()
