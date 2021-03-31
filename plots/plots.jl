@@ -48,7 +48,8 @@ function ionizationrateplot()
     flux = 1e5
 
     np, _ = neutralprofiles(lat, lon, z, dt)
-    md = massdensity.((np,), z)  # g/cm³
+    zstepped = first(z):last(z)
+    md = massdensity.((np,), zstepped)  # g/cm³
 
     S = ionizationprofile(z, energy, energydis, pitchangle, pitchdis, md/1000)*1e6
     S *= flux
@@ -84,4 +85,33 @@ function chargeprofileplot(daytime::Bool)
     plot!(mask.(cp0), z, linestyle=:dash, linewidth=lws,
           color_palette=pal, labels=false)
     plot!(mask.(np.Ne), z, color="black", linewidth=2, linestyle=:dash, label="FIRI")
+end
+
+function fineprofileplot(daytime::Bool)
+    z = 0:110
+    zfine = 0:0.25:110
+    lat, lon = 60, 258
+    flux = 1e5
+
+    if daytime
+        dt = DateTime(2020, 1, 1, 18, 30)
+    else
+        dt = DateTime(2020, 1, 1, 2, 30)
+    end
+
+    npf, daytime = neutralprofiles(lat, lon, zfine, dt)
+    cp0, cp = chargeprofiles(flux, lat, lon, z, dt)
+    cp0f, cpf = chargeprofiles(flux, lat, lon, zfine, dt)
+
+    lws = fill(1.2, (1, length(SPECIES)))
+    lws[1] = 2  # Ne
+
+    pal = palette(:tab10)[1:5]
+    plot(mask.(cp), z, xscale=:log10,
+         labels=permutedims([SPECIES...]), color_palette=pal, linestyle=:solid,
+         xlabel="Density (m⁻³)", ylabel="Altitude (km)", 
+         yticks=0:20:120, xticks=exp10.([0, 3, 6, 9, 12]),
+         legend=:outerright, xlims=(10^0, 10^12), linewidth=lws)
+    plot!(mask.(cpf), zfine, linestyle=:dash, linewidth=lws,
+          color_palette=pal, labels=false)
 end

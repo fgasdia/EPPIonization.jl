@@ -39,7 +39,7 @@ source precipitating electron flux in el/cm²/s.
     - `pitchangle` [deg]: pitch angle between 0 and 90°
     - `pitchdis`: pitch angle distribution
     - `massdensity` [g/cm³/1000]: mass density in new atmosphere in g/cm³ divided by 1000
-        defined at each element of `altitude`
+        defined at kilometer increments from 0 to the maximum of `altitude`
 
 # Example
 
@@ -104,7 +104,6 @@ function ionizationprofile(altitude, energy, energydis, pitchangle, pitchdis, ma
         @views ionnew .+= (endis[i]*den[enind[i]]).*ionen[i,:]
     end
 
-    # extrapolate to altitudes above 500 km
     # Because of the interpolation method, the last element of ionnew is 0. 
     # Thus can only do interpolation in log space between 1 and end-1.
     # Extrapolation in log space to altitudes above 500 km may sometimes look werid. 
@@ -118,7 +117,7 @@ end
 
 function lookupconvert(denold1, ionold1, dennew1, alt)
     if count(>(0), ionold1) < 2 || sum(ionold1) == 1
-        return ionold1
+        return copy(ionold1)
     end
     length(dennew1) == length(alt) || throw(ArgumentError("`dennew1` must be length $(length(alt))"))
 
@@ -190,10 +189,15 @@ end
 
 """
     massdensity(p, z)
+    massdensity(p::GPI.Profiles, z)
 
 Return total neutral atmosphere mass density in g/cm³ at altitude `z` in km.
+
+If `p` is not a `GPI.Profiles`, it will be computed.
+
+`z` must be kilometer intervals.
 """
-function massdensity(p, z)
+function massdensity(p::GPI.Profiles, z)
     # mass = number density [#/m³] * molecular mass [g/mol] * [1 mol/#] * [m³/cm³]
     NA = 6.0221e23
     mN2 = GPI.getspecies(p, :N2, z)*28.014
@@ -202,6 +206,11 @@ function massdensity(p, z)
     m = (mN2 + mO2 + mO)/NA*1e-6
     
     return m
+end
+
+function massdensity(p, z)
+    prof = GPI.Profiles(p)
+    massdensity(prof, z)
 end
 
 """
@@ -226,7 +235,7 @@ function neutralprofiles(lat, lon, z, dt::DateTime)
     g_lon = deg2rad(lon)
     
     h = z.*1000  # m
-    p = nrlmsise00.(jd, h, g_lat, g_lon; output_si=true, dversion=false)  # #/m³
+    p = nrlmsise00.(jd, h, g_lat, g_lon; output_si=true)  # #/m³
     
     f107 = get_space_index(F10M(), jd)  # 81 day average. Doesn't match online exactly.
     nearest_f107 = FIRITools.values(:f10_7)[argmin(abs.(f107 .- FIRITools.values(:f10_7)))]
@@ -234,15 +243,41 @@ function neutralprofiles(lat, lon, z, dt::DateTime)
     Ne0 = firi(sza, lat; f10_7=nearest_f107, month=month(dt))
     Ne = FIRITools.extrapolate(Ne0, h)
     # With specified f10_7 and month, there is only 1 profile after interpolation
-    
+
+    # Comprehension is more type-stable than `getfield.(p, :T_alt)` (if `:h` isn't Float64)
     df = Table(
-        h  = collect(z),
+        h  = collect(z*1.0),  # convert to Float64 for maximum type stability of Table
         Ne = Ne,
-        Tn = getfield.(p, :T_alt),
-        O  = getfield.(p, :den_O),
-        N2 = getfield.(p, :den_N2),
-        O2 = getfield.(p, :den_O2)
+        Tn = [p[i].T_alt for i in eachindex(p)],
+        O  = [p[i].den_O for i in eachindex(p)],
+        N2 = [p[i].den_N2 for i in eachindex(p)],
+        O2 = [p[i].den_O2 for i in eachindex(p)]
     )
+
+    # Sometimes a single (or maybe more?) height has NaN in MSIS. Not sure why...
+    mask = isnan.(df.Tn)
+    if any(mask)
+        itp = LinearInterpolation(df.h[.!mask], df.Tn[.!mask])
+        df.Tn .= itp(df.h)
+    end
+
+    mask .= isnan.(df.O)
+    if any(mask)
+        itp = LinearInterpolation(df.h[.!mask], df.O[.!mask])
+        df.O .= itp(df.h)
+    end
+
+    mask .= isnan.(df.O2)
+    if any(mask)
+        itp = LinearInterpolation(df.h[.!mask], df.O2[.!mask])
+        df.O2 .= itp(df.h)
+    end
+
+    mask .= isnan.(df.N2)
+    if any(mask)
+        itp = LinearInterpolation(df.h[.!mask], df.N2[.!mask])
+        df.N2 .= itp(df.h)
+    end
     
     return df, isday(sza)
 end
@@ -260,7 +295,11 @@ function chargeprofiles(flux, neutraltable, z, daytime::Bool)
     pitchangle = 0:90
     pitchdis = ones(length(pitchangle))
 
-    md = massdensity.((neutraltable,), z)  # g/cm³
+    # `md` must be defined at kilometer intervals, but the ionization profile can be at
+    # finer `z` steps
+    zstepped = first(z):last(z)
+    p = GPI.Profiles(neutraltable)
+    md = massdensity.((p,), zstepped)  # g/cm³
     S = ionizationprofile(z, energy, energydis, pitchangle, pitchdis, md/1000)*1e6
     S *= flux
 

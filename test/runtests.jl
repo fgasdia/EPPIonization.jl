@@ -1,7 +1,7 @@
 using Test, EPPIonization
-using DelimitedFiles, Dates
-
 using EPPIonization: datadir
+
+using DelimitedFiles, Dates
 
 
 function comparematlab()
@@ -43,6 +43,18 @@ function profiles()
 
     @test background1 == background2
     @test perturbed1 == perturbed2
+
+    # Non-integer steps
+    zfine = 0:0.25:110
+    np, daytime = neutralprofiles(lat, lon, zfine, dt)
+    background3, perturbed3 = chargeprofiles(flux, lat, lon, zfine, dt)
+    background4, perturbed4 = chargeprofiles(flux, np, zfine, daytime)
+    
+    @test background3 == background4
+    @test perturbed3 == perturbed4
+
+    @test background1 ≈ background3[1:4:end,:] rtol=0.01
+    @test background2 ≈ background4[1:4:end,:] rtol=0.01
 end
 
 @testset "EPPIonization" begin
