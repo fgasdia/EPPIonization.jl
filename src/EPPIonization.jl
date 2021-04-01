@@ -52,13 +52,13 @@ ion = ionizationprofile(alt, energy, energydis, pitchangle, pitchdis, massdensit
 ```
 """
 function ionizationprofile(altitude, energy, energydis, pitchangle, pitchdis, massdensity)
+    maximum(altitude) > 500 && throw(ArgumentError("`altitude` should not exceed 500 km"))
+
     en, pa, ion, masden, alt = readlut()
 
     # Mask values up to maximum of `altitude`
     mask = alt .<= maximum(altitude)
     alt = alt[mask]
-    masden = masden[mask]
-    ion = ion[:,:,mask]
     
     # calculate energy bins
     edge = Vector{Float64}(undef, length(en)+1)
@@ -67,20 +67,24 @@ function ionizationprofile(altitude, energy, energydis, pitchangle, pitchdis, ma
     edge[end] = en[end] + (en[end] - en[end-1])/2
     den = diff(edge)
 
+    # initialize for lookupconvert
+    alt2 = alt .+ 0.5  # == (alt .+ (alt .+ 1))./2
+    do_itp = LinearInterpolation(alt, log.(view(masden, mask)), extrapolation_bc=Line())
+    denold = exp.(do_itp(alt2))
+    reverse!(denold)
+
     # convert the lookup table to a new atmosphere
-    ionint = Array{Float64,3}(undef, length(en), length(pa), length(massdensity))
+    ionint = zeros(length(en), length(pa), length(massdensity))
     for j = 1:length(pa) - 1
         for i = 1:length(en)
-            @inbounds ionint[i,j,:] = lookupconvert(masden, view(ion,i,j,:), massdensity, alt)
+            lookupconvert!(view(ionint,i,j,:), denold, view(ion,i,j,mask), massdensity, alt, alt2)
         end
     end
-    ionint[:,end,:] .= 0
 
     # interpolate the input energy and pitch angle distributions
     enind = findall(x->minimum(energy) <= x <= maximum(energy), en)
 
     # interpolate in energy
-    # enint=10.^interp1(log10(energy),log10(energydis),log10(en(enind)),'linear','extrap');
     en_itp = LinearInterpolation(energy, energydis, extrapolation_bc=Line())
     enint = en_itp(view(en,enind))
 
@@ -89,7 +93,7 @@ function ionizationprofile(altitude, energy, energydis, pitchangle, pitchdis, ma
     paint = pa_itp(pa)
 
     # normalize in energy 
-    endis = enint./sum(enint.*view(den,enind))
+    endis = enint./sum(enint.*view(den, enind))
 
     # normalize in pitch angle
     padis = paint./sum(paint)
@@ -97,17 +101,13 @@ function ionizationprofile(altitude, energy, energydis, pitchangle, pitchdis, ma
     # calculate the ionization profile, sum of ionization contribution from each energy and pitch angle component
     ionen = zeros(length(enind), length(alt))
     ionnew = zeros(length(alt))
-    for i = 1:length(enind)
+    @views for i = 1:length(enind)
         for h = 1:length(pa)
-            @views ionen[i,:] .+= padis[h].*ionint[enind[i],h,:]
+            ionen[i,:] .+= padis[h].*ionint[enind[i],h,:]
         end
-        @views ionnew .+= (endis[i]*den[enind[i]]).*ionen[i,:]
+        ionnew .+= (endis[i]*den[enind[i]]).*ionen[i,:]
     end
 
-    # Because of the interpolation method, the last element of ionnew is 0. 
-    # Thus can only do interpolation in log space between 1 and end-1.
-    # Extrapolation in log space to altitudes above 500 km may sometimes look werid. 
-    # Extra caution!
     @views ion_itp = LinearInterpolation(alt[1:end-1], log.(ionnew[1:end-1]), extrapolation_bc=Line())
     ionpro = exp.(ion_itp(altitude))
     replace!(ionpro, NaN=>0)
@@ -115,29 +115,24 @@ function ionizationprofile(altitude, energy, energydis, pitchangle, pitchdis, ma
     return ionpro
 end
 
-function lookupconvert(denold1, ionold1, dennew1, alt)
+function lookupconvert!(ionnew, denold, ionold1, dennew1, alt, alt2)
     if count(>(0), ionold1) < 2 || sum(ionold1) == 1
         return copy(ionold1)
     end
     length(dennew1) == length(alt) || throw(ArgumentError("`dennew1` must be length $(length(alt))"))
 
-    # TODO: we can precompute some of the values in this function
+    denold = copy(denold)  # it's mutated below
 
     # calculate ionization rate at half grid cells
-    alt2 = (alt .+ (alt .+ 1))./2
-
-    do_itp = LinearInterpolation(alt, log.(denold1), extrapolation_bc=Line())
     io_itp = LinearInterpolation(alt, log.(ionold1), extrapolation_bc=Line())
     dn_itp = LinearInterpolation(alt, log.(dennew1), extrapolation_bc=Line())
-    denold = exp.(do_itp(alt2))
     ionold = exp.(io_itp(alt2))
     dennew = exp.(dn_itp(alt2))
 
     # sort the ionization production and mass density
     # from 500 km to the lowest altitude of ionzation production
-    reverse!(denold)
-    reverse!(dennew)
     reverse!(ionold)
+    reverse!(dennew)
 
     # find out the lowest altitude of energy deposition in reference and new atmosphere
     # `ionold1` last element is `0`.
@@ -154,34 +149,38 @@ function lookupconvert(denold1, ionold1, dennew1, alt)
     dennew[minaltnew+1:end] .= 0
 
     # cumulatively sum mass density and ionization rate
-    denold_csum = round.(cumsum(denold)/sum_denold, digits=15)  # there's a problem if 0.9999999999999999
-    ionold_csum = cumsum(ionold)
-    dennew_csum = round.(cumsum(dennew)/sum(dennew), digits=15)
+    # as of Julia v1.6.0, cumsum!(x, x) is safe and does what would be expected of cumsum!(x)
+    cumsum!(denold, denold)
+    denold ./= sum_denold  # denold_csum = round.(cumsum(denold)./sum_denold, digits=15)
+    cumsum!(ionold, ionold)  # ionold_cumsum = cumsum(ionold)
+    sum_dennew = sum(dennew) # dennew_csum = round.(cumsum(dennew)./sum(dennew), digits=15)
+    cumsum!(dennew, dennew)
+    dennew ./= sum_dennew
+
     ionnew_csum = zeros(length(dennew))
-    ionnew = zeros(length(dennew))
 
     # interpolate the cumulative sum of ionization rate from 500 km to the lowest altitude
-    intind = findfirst(>(denold_csum[3]), dennew_csum)
-    if isnothing(intind)
-        # pass
-    elseif intind > 1
-        min_itp = LinearInterpolation(log.(view(denold_csum,3:minaltold)),
-                                      log.(view(ionold_csum,3:minaltold)), extrapolation_bc=Line())
-        ionnew_csum[intind:minaltnew] = exp.(min_itp(log.(view(dennew_csum, intind:minaltnew))))
+    intind = findfirst(>(denold[3]), dennew)
+    if !isnothing(intind)
+        # intind == 1
+        min_itp = LinearInterpolation(log.(view(denold, 3:minaltold)),
+                                      log.(view(ionold, 3:minaltold)),
+                                      extrapolation_bc=Line())
+        ionnew_csum[intind:minaltnew] .= exp.(min_itp(log.(view(dennew, intind:minaltnew))))
 
-        uniqueval = unique(ionold_csum)
-        uniind = findfirst(isequal(uniqueval[end]), ionold_csum)
-        uni_itp = LinearInterpolation(view(denold_csum,3:uniind),
-                                      view(ionold_csum,3:uniind), extrapolation_bc=Line())
-        ionnew_csum[1:intind] = uni_itp(view(dennew_csum,1:intind))
-    elseif intind == 1
-        min_itp = LinearInterpolation(log.(view(denold_csum,3:minaltold)),
-                                      log.(view(ionold_csum,3:minaltold)), extrapolation_bc=Line())
-        ionnew_csum[intind:minaltnew] = exp.(min_itp(log.(view(dennew_csum, intind:minaltnew))))
+        if intind > 1
+            uniqueval = unique(ionold)
+            uniind = findfirst(isequal(uniqueval[end]), ionold)
+            uni_itp = LinearInterpolation(view(denold, 3:uniind),
+                                          view(ionold, 3:uniind),
+                                          extrapolation_bc=Line())
+            
+            ionnew_csum[1:intind] .= uni_itp(view(dennew, 1:intind))
+        end
     end
 
     # differentiate the interpolation results and calculate ionization rate at each altitude
-    @views ionnew[2:minaltnew] .= ionnew_csum[2:minaltnew] .- ionnew_csum[1:minaltnew-1]
+    ionnew[2:minaltnew] .= view(ionnew_csum, 2:minaltnew) .- view(ionnew_csum, 1:minaltnew-1)
     replace!(x->x < 0 ? zero(x) : x, ionnew)
 
     return reverse!(ionnew)  # back to alt order
@@ -257,26 +256,26 @@ function neutralprofiles(lat, lon, z, dt::DateTime)
     # Sometimes a single (or maybe more?) height has NaN in MSIS. Not sure why...
     mask = isnan.(df.Tn)
     if any(mask)
-        itp = LinearInterpolation(df.h[.!mask], df.Tn[.!mask])
-        df.Tn .= itp(df.h)
+        itp1 = LinearInterpolation(df.h[.!mask], df.Tn[.!mask])
+        df.Tn .= itp1(df.h)
     end
 
     mask .= isnan.(df.O)
     if any(mask)
-        itp = LinearInterpolation(df.h[.!mask], df.O[.!mask])
-        df.O .= itp(df.h)
+        itp2 = LinearInterpolation(df.h[.!mask], df.O[.!mask])
+        df.O .= itp2(df.h)
     end
 
     mask .= isnan.(df.O2)
     if any(mask)
-        itp = LinearInterpolation(df.h[.!mask], df.O2[.!mask])
-        df.O2 .= itp(df.h)
+        itp3 = LinearInterpolation(df.h[.!mask], df.O2[.!mask])
+        df.O2 .= itp3(df.h)
     end
 
     mask .= isnan.(df.N2)
     if any(mask)
-        itp = LinearInterpolation(df.h[.!mask], df.N2[.!mask])
-        df.N2 .= itp(df.h)
+        itp4 = LinearInterpolation(df.h[.!mask], df.N2[.!mask])
+        df.N2 .= itp4(df.h)
     end
     
     return df, isday(sza)
@@ -290,7 +289,7 @@ Compute GPI background and EPP-perturbed profiles for precipitating electron `fl
 el/cm²/s, `lat` and `lon` in degrees, heights `z`, and time `dt`.
 """
 function chargeprofiles(flux, neutraltable, z, daytime::Bool)
-    energy = 90e3:0.01:2.2e6  # eV; 90 keV to 2.2 MeV
+    energy = 90e3:1e4:2.2e6  # eV; 90 keV to 2.2 MeV every 10 keV
     energydis = exp.(-energy/2e5)  # f(E) ∝ exp(-E/β) where β ranges from 100 to 300 keV
     pitchangle = 0:90
     pitchdis = ones(length(pitchangle))
