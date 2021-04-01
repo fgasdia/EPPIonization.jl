@@ -282,13 +282,13 @@ function neutralprofiles(lat, lon, z, dt::DateTime)
 end
 
 """
-    chargeprofiles(flux, lat, lon, z, dt::DateTime)
-    chargeprofiles(flux, neutraltable, z, daytime::Bool)
+    chargeprofiles(flux, lat, lon, z, dt::DateTime; t=1e7)
+    chargeprofiles(flux, neutraltable, z, daytime::Bool; t=1e7)
 
 Compute GPI background and EPP-perturbed profiles for precipitating electron `flux` in
 el/cm²/s, `lat` and `lon` in degrees, heights `z`, and time `dt`.
 """
-function chargeprofiles(flux, neutraltable, z, daytime::Bool)
+function chargeprofiles(flux, neutraltable, z, daytime::Bool; t=1e7)
     energy = 90e3:1e4:2.2e6  # eV; 90 keV to 2.2 MeV every 10 keV
     energydis = exp.(-energy/2e5)  # f(E) ∝ exp(-E/β) where β ranges from 100 to 300 keV
     pitchangle = 0:90
@@ -302,14 +302,14 @@ function chargeprofiles(flux, neutraltable, z, daytime::Bool)
     S = ionizationprofile(z, energy, energydis, pitchangle, pitchdis, md/1000)*1e6
     S *= flux
 
-    Nspec0, Nspec = gpi(neutraltable, z, daytime, S)
+    Nspec0, Nspec = gpi(neutraltable, z, daytime, S; t=t)
 
     return Nspec0, Nspec
 end
 
-function chargeprofiles(flux, lat, lon, z, dt::DateTime)
+function chargeprofiles(flux, lat, lon, z, dt::DateTime; t=1e7)
     neutraltable, daytime = neutralprofiles(lat, lon, z, dt)
-    chargeprofiles(flux, neutraltable, z, daytime)
+    chargeprofiles(flux, neutraltable, z, daytime; t=t)
 end
     
 end # module

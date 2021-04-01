@@ -115,3 +115,34 @@ function fineprofileplot(daytime::Bool)
     plot!(mask.(cpf), zfine, linestyle=:dash, linewidth=lws,
           color_palette=pal, labels=false)
 end
+
+function relaxationplot(daytime::Bool)
+    z = 0:110
+    zfine = 0:0.25:110
+    lat, lon = 60, 258
+    flux = 1e5
+
+    if daytime
+        dt = DateTime(2020, 1, 1, 18, 30)
+    else
+        dt = DateTime(2020, 1, 1, 2, 30)
+    end
+
+    ts = exp10.(1:8)
+
+    Nes = Matrix{Float64}(undef, length(z), length(ts))
+    Ne0s = similar(Nes)
+    for i in eachindex(ts)
+        Nspec0, Nspec = chargeprofiles(flux, lat, lon, z, dt; t=ts[i])
+        Nes[:,i] = Nspec[:,1]
+        Ne0s[:,i] = Nspec0[:,1]
+    end
+    
+    # Turns out t doesn't matter much in terms of runtime
+    plot(mask.(Nes), z, xscale=:log10,
+         xlabel="Density (m⁻³)", ylabel="Altitude (km)", legendtitle="10^",
+         yticks=0:20:120, xticks=exp10.([0, 3, 6, 9, 12]), xlims=(10^0, 10^12),
+         linewidth=1.2, labels=permutedims(log10.(ts)), legend=:topleft)
+    plot!(mask.(Ne0s), z, linestyle=:dash, linewidth=1.2,
+          labels=false)
+end
