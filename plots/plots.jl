@@ -41,7 +41,7 @@ function ionizationrateplot()
     dt = DateTime(2020, 1, 1, 2, 30)
     lat, lon = 60, 258
 
-    energy = 90e3:0.01:2.2e6  # eV; 90 keV to 2.2 MeV
+    energy = 90e3:1e4:2.2e6  # eV; 90 keV to 2.2 MeV
     energydis = exp.(-energy/2e5)  # f(E) ∝ exp(-E/β) where β ranges from 100 to 300 keV
     pitchangle = 0:90
     pitchdis = ones(length(pitchangle))
