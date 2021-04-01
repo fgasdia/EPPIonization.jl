@@ -257,26 +257,26 @@ function neutralprofiles(lat, lon, z, dt::DateTime)
     # Sometimes a single (or maybe more?) height has NaN in MSIS. Not sure why...
     mask = isnan.(df.Tn)
     if any(mask)
-        itp = LinearInterpolation(df.h[.!mask], df.Tn[.!mask])
-        df.Tn .= itp(df.h)
+        itp1 = LinearInterpolation(df.h[.!mask], df.Tn[.!mask])
+        df.Tn .= itp1(df.h)
     end
 
     mask .= isnan.(df.O)
     if any(mask)
-        itp = LinearInterpolation(df.h[.!mask], df.O[.!mask])
-        df.O .= itp(df.h)
+        itp2 = LinearInterpolation(df.h[.!mask], df.O[.!mask])
+        df.O .= itp2(df.h)
     end
 
     mask .= isnan.(df.O2)
     if any(mask)
-        itp = LinearInterpolation(df.h[.!mask], df.O2[.!mask])
-        df.O2 .= itp(df.h)
+        itp3 = LinearInterpolation(df.h[.!mask], df.O2[.!mask])
+        df.O2 .= itp3(df.h)
     end
 
     mask .= isnan.(df.N2)
     if any(mask)
-        itp = LinearInterpolation(df.h[.!mask], df.N2[.!mask])
-        df.N2 .= itp(df.h)
+        itp4 = LinearInterpolation(df.h[.!mask], df.N2[.!mask])
+        df.N2 .= itp4(df.h)
     end
     
     return df, isday(sza)
