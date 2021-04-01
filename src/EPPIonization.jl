@@ -67,11 +67,17 @@ function ionizationprofile(altitude, energy, energydis, pitchangle, pitchdis, ma
     edge[end] = en[end] + (en[end] - en[end-1])/2
     den = diff(edge)
 
+    # initialize for lookupconvert
+    alt2 = alt .+ 0.5  # == (alt .+ (alt .+ 1))./2
+    do_itp = LinearInterpolation(alt, log.(masden), extrapolation_bc=Line())
+    denold = exp.(do_itp(alt2))
+    reverse!(denold)
+
     # convert the lookup table to a new atmosphere
     ionint = Array{Float64,3}(undef, length(en), length(pa), length(massdensity))
     for j = 1:length(pa) - 1
         for i = 1:length(en)
-            @inbounds ionint[i,j,:] = lookupconvert(masden, view(ion,i,j,:), massdensity, alt)
+            @inbounds ionint[i,j,:] .= lookupconvert(denold, view(ion,i,j,:), massdensity, alt, alt2)
         end
     end
     ionint[:,end,:] .= 0
@@ -89,7 +95,7 @@ function ionizationprofile(altitude, energy, energydis, pitchangle, pitchdis, ma
     paint = pa_itp(pa)
 
     # normalize in energy 
-    endis = enint./sum(enint.*view(den,enind))
+    endis = enint./sum(enint.*view(den, enind))
 
     # normalize in pitch angle
     padis = paint./sum(paint)
@@ -115,29 +121,25 @@ function ionizationprofile(altitude, energy, energydis, pitchangle, pitchdis, ma
     return ionpro
 end
 
-function lookupconvert(denold1, ionold1, dennew1, alt)
+# TODO: can do inplace operations (cumsum!) with preallocated vector
+function lookupconvert(denold, ionold1, dennew1, alt, alt2)
     if count(>(0), ionold1) < 2 || sum(ionold1) == 1
         return copy(ionold1)
     end
     length(dennew1) == length(alt) || throw(ArgumentError("`dennew1` must be length $(length(alt))"))
 
-    # TODO: we can precompute some of the values in this function
+    denold = copy(denold)  # it's mutated below
 
     # calculate ionization rate at half grid cells
-    alt2 = (alt .+ (alt .+ 1))./2
-
-    do_itp = LinearInterpolation(alt, log.(denold1), extrapolation_bc=Line())
     io_itp = LinearInterpolation(alt, log.(ionold1), extrapolation_bc=Line())
     dn_itp = LinearInterpolation(alt, log.(dennew1), extrapolation_bc=Line())
-    denold = exp.(do_itp(alt2))
     ionold = exp.(io_itp(alt2))
     dennew = exp.(dn_itp(alt2))
 
     # sort the ionization production and mass density
     # from 500 km to the lowest altitude of ionzation production
-    reverse!(denold)
-    reverse!(dennew)
     reverse!(ionold)
+    reverse!(dennew)
 
     # find out the lowest altitude of energy deposition in reference and new atmosphere
     # `ionold1` last element is `0`.
