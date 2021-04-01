@@ -121,7 +121,6 @@ function ionizationprofile(altitude, energy, energydis, pitchangle, pitchdis, ma
     return ionpro
 end
 
-# TODO: can do inplace operations (cumsum!) with preallocated vector
 function lookupconvert(denold, ionold1, dennew1, alt, alt2)
     if count(>(0), ionold1) < 2 || sum(ionold1) == 1
         return copy(ionold1)
@@ -156,30 +155,35 @@ function lookupconvert(denold, ionold1, dennew1, alt, alt2)
     dennew[minaltnew+1:end] .= 0
 
     # cumulatively sum mass density and ionization rate
-    denold_csum = round.(cumsum(denold)/sum_denold, digits=15)  # there's a problem if 0.9999999999999999
-    ionold_csum = cumsum(ionold)
-    dennew_csum = round.(cumsum(dennew)/sum(dennew), digits=15)
+    # as of Julia v1.6.0, cumsum!(x, x) is safe and does what would be expected of cumsum!(x)
+    cumsum!(denold, denold)
+    denold ./= sum_denold  # denold_csum = round.(cumsum(denold)./sum_denold, digits=15)
+    cumsum!(ionold, ionold)  # ionold_cumsum = cumsum(ionold)
+    sum_dennew = sum(dennew) # dennew_csum = round.(cumsum(dennew)./sum(dennew), digits=15)
+    cumsum!(dennew, dennew)
+    dennew ./= sum_dennew
+
     ionnew_csum = zeros(length(dennew))
-    ionnew = zeros(length(dennew))
+    ionnew = zeros(length(dennew))  # TODO: inplace?
 
     # interpolate the cumulative sum of ionization rate from 500 km to the lowest altitude
-    intind = findfirst(>(denold_csum[3]), dennew_csum)
-    if isnothing(intind)
-        # pass
-    elseif intind > 1
-        min_itp = LinearInterpolation(log.(view(denold_csum,3:minaltold)),
-                                      log.(view(ionold_csum,3:minaltold)), extrapolation_bc=Line())
-        ionnew_csum[intind:minaltnew] = exp.(min_itp(log.(view(dennew_csum, intind:minaltnew))))
+    intind = findfirst(>(denold[3]), dennew)
+    if !isnothing(intind)
+        # intind == 1
+        min_itp = LinearInterpolation(log.(view(denold, 3:minaltold)),
+                                      log.(view(ionold, 3:minaltold)),
+                                      extrapolation_bc=Line())
+        ionnew_csum[intind:minaltnew] .= exp.(min_itp(log.(view(dennew, intind:minaltnew))))
 
-        uniqueval = unique(ionold_csum)
-        uniind = findfirst(isequal(uniqueval[end]), ionold_csum)
-        uni_itp = LinearInterpolation(view(denold_csum,3:uniind),
-                                      view(ionold_csum,3:uniind), extrapolation_bc=Line())
-        ionnew_csum[1:intind] = uni_itp(view(dennew_csum,1:intind))
-    elseif intind == 1
-        min_itp = LinearInterpolation(log.(view(denold_csum,3:minaltold)),
-                                      log.(view(ionold_csum,3:minaltold)), extrapolation_bc=Line())
-        ionnew_csum[intind:minaltnew] = exp.(min_itp(log.(view(dennew_csum, intind:minaltnew))))
+        if intind > 1
+            uniqueval = unique(ionold)
+            uniind = findfirst(isequal(uniqueval[end]), ionold)
+            uni_itp = LinearInterpolation(view(denold, 3:uniind),
+                                          view(ionold, 3:uniind),
+                                          extrapolation_bc=Line())
+            
+            ionnew_csum[1:intind] .= uni_itp(view(dennew, 1:intind))
+        end
     end
 
     # differentiate the interpolation results and calculate ionization rate at each altitude
