@@ -52,13 +52,13 @@ ion = ionizationprofile(alt, energy, energydis, pitchangle, pitchdis, massdensit
 ```
 """
 function ionizationprofile(altitude, energy, energydis, pitchangle, pitchdis, massdensity)
+    maximum(altitude) > 500 && throw(ArgumentError("`altitude` should not exceed 500 km"))
+
     en, pa, ion, masden, alt = readlut()
 
     # Mask values up to maximum of `altitude`
     mask = alt .<= maximum(altitude)
     alt = alt[mask]
-    masden = masden[mask]
-    ion = ion[:,:,mask]
     
     # calculate energy bins
     edge = Vector{Float64}(undef, length(en)+1)
@@ -69,24 +69,22 @@ function ionizationprofile(altitude, energy, energydis, pitchangle, pitchdis, ma
 
     # initialize for lookupconvert
     alt2 = alt .+ 0.5  # == (alt .+ (alt .+ 1))./2
-    do_itp = LinearInterpolation(alt, log.(masden), extrapolation_bc=Line())
+    do_itp = LinearInterpolation(alt, log.(view(masden, mask)), extrapolation_bc=Line())
     denold = exp.(do_itp(alt2))
     reverse!(denold)
 
     # convert the lookup table to a new atmosphere
-    ionint = Array{Float64,3}(undef, length(en), length(pa), length(massdensity))
+    ionint = zeros(length(en), length(pa), length(massdensity))
     for j = 1:length(pa) - 1
         for i = 1:length(en)
-            @inbounds ionint[i,j,:] .= lookupconvert(denold, view(ion,i,j,:), massdensity, alt, alt2)
+            lookupconvert!(view(ionint,i,j,:), denold, view(ion,i,j,mask), massdensity, alt, alt2)
         end
     end
-    ionint[:,end,:] .= 0
 
     # interpolate the input energy and pitch angle distributions
     enind = findall(x->minimum(energy) <= x <= maximum(energy), en)
 
     # interpolate in energy
-    # enint=10.^interp1(log10(energy),log10(energydis),log10(en(enind)),'linear','extrap');
     en_itp = LinearInterpolation(energy, energydis, extrapolation_bc=Line())
     enint = en_itp(view(en,enind))
 
@@ -103,17 +101,13 @@ function ionizationprofile(altitude, energy, energydis, pitchangle, pitchdis, ma
     # calculate the ionization profile, sum of ionization contribution from each energy and pitch angle component
     ionen = zeros(length(enind), length(alt))
     ionnew = zeros(length(alt))
-    for i = 1:length(enind)
+    @views for i = 1:length(enind)
         for h = 1:length(pa)
-            @views ionen[i,:] .+= padis[h].*ionint[enind[i],h,:]
+            ionen[i,:] .+= padis[h].*ionint[enind[i],h,:]
         end
-        @views ionnew .+= (endis[i]*den[enind[i]]).*ionen[i,:]
+        ionnew .+= (endis[i]*den[enind[i]]).*ionen[i,:]
     end
 
-    # Because of the interpolation method, the last element of ionnew is 0. 
-    # Thus can only do interpolation in log space between 1 and end-1.
-    # Extrapolation in log space to altitudes above 500 km may sometimes look werid. 
-    # Extra caution!
     @views ion_itp = LinearInterpolation(alt[1:end-1], log.(ionnew[1:end-1]), extrapolation_bc=Line())
     ionpro = exp.(ion_itp(altitude))
     replace!(ionpro, NaN=>0)
@@ -121,7 +115,7 @@ function ionizationprofile(altitude, energy, energydis, pitchangle, pitchdis, ma
     return ionpro
 end
 
-function lookupconvert(denold, ionold1, dennew1, alt, alt2)
+function lookupconvert!(ionnew, denold, ionold1, dennew1, alt, alt2)
     if count(>(0), ionold1) < 2 || sum(ionold1) == 1
         return copy(ionold1)
     end
@@ -164,7 +158,6 @@ function lookupconvert(denold, ionold1, dennew1, alt, alt2)
     dennew ./= sum_dennew
 
     ionnew_csum = zeros(length(dennew))
-    ionnew = zeros(length(dennew))  # TODO: inplace?
 
     # interpolate the cumulative sum of ionization rate from 500 km to the lowest altitude
     intind = findfirst(>(denold[3]), dennew)
@@ -187,7 +180,7 @@ function lookupconvert(denold, ionold1, dennew1, alt, alt2)
     end
 
     # differentiate the interpolation results and calculate ionization rate at each altitude
-    @views ionnew[2:minaltnew] .= ionnew_csum[2:minaltnew] .- ionnew_csum[1:minaltnew-1]
+    ionnew[2:minaltnew] .= view(ionnew_csum, 2:minaltnew) .- view(ionnew_csum, 1:minaltnew-1)
     replace!(x->x < 0 ? zero(x) : x, ionnew)
 
     return reverse!(ionnew)  # back to alt order
