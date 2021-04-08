@@ -311,5 +311,28 @@ function chargeprofiles(flux, lat, lon, z, dt::DateTime; t=1e7)
     neutraltable, daytime = neutralprofiles(lat, lon, z, dt)
     chargeprofiles(flux, neutraltable, z, daytime; t=t)
 end
+
+"""
+    chargeprofiles(lat, lon, z, dt::DateTime; t=1e7)
+    chargeprofiles(neutraltable, z, daytime::Bool; t=1e7)
+
+Return the unperturbed (zero flux) GPI background profiles only.
+"""
+function chargeprofiles(neutraltable, z, daytime::Bool; t=1e7)
+    # `md` must be defined at kilometer intervals, but the ionization profile can be at
+    # finer `z` steps
+    zstepped = first(z):last(z)
+    p = GPI.Profiles(neutraltable)
+    md = massdensity.((p,), zstepped)  # g/cm³
+
+    Nspec0, S = equilibrium(neutraltable, z, daytime; t=t)
+
+    return Nspec0
+end
+
+function chargeprofiles(lat, lon, z, dt::DateTime; t=1e7)
+    neutraltable, daytime = neutralprofiles(lat, lon, z, dt)
+    chargeprofiles(neutraltable, z, daytime; t=t)
+end
     
 end # module

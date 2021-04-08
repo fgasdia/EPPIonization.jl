@@ -44,6 +44,14 @@ function profiles()
     @test background1 == background2
     @test perturbed1 == perturbed2
 
+    # Zero-flux profiles
+    background5a = chargeprofiles(lat, lon, z, dt)
+    background5b = chargeprofiles(np, z, daytime)
+    background6, perturbed6 = chargeprofiles(0, lat, lon, z, dt)
+
+    @test background5a == background5b
+    @test background5a ≈ background6
+    
     # Non-integer steps
     zfine = 0:0.25:110
     np, daytime = neutralprofiles(lat, lon, zfine, dt)
