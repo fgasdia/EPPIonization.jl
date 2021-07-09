@@ -14,9 +14,20 @@ LMPTools = "9da4b389-a4e8-40b7-9cd7-952b7f4c5d81"
 SatelliteToolbox = "6ac157d9-b43d-51bb-8fab-48bf53814f4a"
 TypedTables = "9d95f2ec-7b3d-5a63-8d20-e2491e220bb9"
 
+[compat]
+FIRITools = "0.0.4"
+GPI = "0.0.2"
+GeographicLib = "0.4"
+HDF5 = "0.15"
+Interpolations = "0.13"
+LMPTools = "0.0.7"
+SatelliteToolbox = "0.9"
+TypedTables = "1.2"
+
 [extras]
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
 DelimitedFiles = "8bb1440f-4735-579b-a4ab-409b98df4dab"
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
-test = ["Test", "DelimitedFiles"]
+test = ["Test", "Dates", "DelimitedFiles"]
