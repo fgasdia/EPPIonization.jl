@@ -24,6 +24,16 @@ function readlut()
 end
 
 """
+    set_initialized!(::Bool)
+
+Force the global variable `INITIALIZED`, corresponding to whether or not `init_space_indices`
+has been run, to `v::Bool`.
+"""
+function set_initialized!(v::Bool)
+    INITIALIZED[] = v
+end
+
+"""
     ionizationprofile(altitude, energy, energydis, pitchangle, pitchdis, massdensity)
 
 Compute ionization rate profile in pairs/el/cm as a function of `altitude` in km.
