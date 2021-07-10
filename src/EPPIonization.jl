@@ -230,14 +230,14 @@ and UTC time `dt` is daytime. The profiles will be evaluated at heights `z` in k
 """
 function neutralprofiles(lat, lon, z, dt::DateTime)
     if !INITIALIZED[]
-        init_space_indices(enabled_files=[:fluxtable, :wdcfiles],
-            fluxtable_force_download=false, wdcfiles_force_download=false)
+        wdcfiles_oldest_year = min(year(now())-3, year(dt))
+        init_space_indices(;enabled_files=[:fluxtable, :wdcfiles], wdcfiles_oldest_year)
         INITIALIZED[] = true
     end
 
     lon = mod(lon, 360)
 
-    jd = DatetoJD(dt)
+    jd = date_to_jd(dt)
     sza = zenithangle(lat, lon, dt)
     
     g_lat = deg2rad(lat)
