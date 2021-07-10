@@ -34,7 +34,7 @@ function set_initialized!(v::Bool)
 end
 
 """
-    ionizationprofile(altitude, energy, energydis, pitchangle, pitchdis, massdensity)
+    ionizationprofile(altitude, energy, energydis, pitchangle, pitchdis, massdensity) → ionprofile
 
 Compute ionization rate profile in pairs/el/cm as a function of `altitude` in km.
 
@@ -223,7 +223,7 @@ function massdensity(p, z)
 end
 
 """
-    neutralprofiles(lat, lon, z, dt::DateTime)
+    neutralprofiles(lat, lon, z, dt::DateTime) → (table, daytime)
 
 Return `Table` of neutral atmosphere profiles and a boolean value if the `lat`, `lon` (deg)
 and UTC time `dt` is daytime. The profiles will be evaluated at heights `z` in km.
@@ -292,7 +292,7 @@ function neutralprofiles(lat, lon, z, dt::DateTime)
 end
 
 """
-    chargeprofiles(flux, lat, lon, z, dt::DateTime; t=1e7)
+    chargeprofiles(flux, lat, lon, z, dt::DateTime; t=1e7) → (background_profiles, perturbed_profiles)
     chargeprofiles(flux, neutraltable, z, daytime::Bool; t=1e7)
 
 Compute GPI background and EPP-perturbed profiles for precipitating electron `flux` in
@@ -323,21 +323,15 @@ function chargeprofiles(flux, lat, lon, z, dt::DateTime; t=1e7)
 end
 
 """
-    chargeprofiles(lat, lon, z, dt::DateTime; t=1e7)
+    chargeprofiles(lat, lon, z, dt::DateTime; t=1e7) → (background_profile, nothing)
     chargeprofiles(neutraltable, z, daytime::Bool; t=1e7)
 
 Return the unperturbed (zero flux) GPI background profiles only.
 """
 function chargeprofiles(neutraltable, z, daytime::Bool; t=1e7)
-    # `md` must be defined at kilometer intervals, but the ionization profile can be at
-    # finer `z` steps
-    zstepped = first(z):last(z)
-    p = GPI.Profiles(neutraltable)
-    md = massdensity.((p,), zstepped)  # g/cm³
+    Nspec0, _ = equilibrium(neutraltable, z, daytime; t=t)
 
-    Nspec0, S = equilibrium(neutraltable, z, daytime; t=t)
-
-    return Nspec0
+    return Nspec0, nothing
 end
 
 function chargeprofiles(lat, lon, z, dt::DateTime; t=1e7)

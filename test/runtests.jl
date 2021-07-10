@@ -45,9 +45,9 @@ function profiles()
     @test perturbed1 == perturbed2
 
     # Zero-flux profiles
-    background5a = chargeprofiles(lat, lon, z, dt)
-    background5b = chargeprofiles(np, z, daytime)
-    background6, perturbed6 = chargeprofiles(0, lat, lon, z, dt)
+    background5a, _ = chargeprofiles(lat, lon, z, dt)
+    background5b, _ = chargeprofiles(np, z, daytime)
+    background6, _ = chargeprofiles(0, lat, lon, z, dt)
 
     @test background5a == background5b
     @test background5a ≈ background6
