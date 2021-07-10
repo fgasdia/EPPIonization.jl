@@ -24,7 +24,17 @@ function readlut()
 end
 
 """
-    ionizationprofile(altitude, energy, energydis, pitchangle, pitchdis, massdensity)
+    set_initialized!(::Bool)
+
+Force the global variable `INITIALIZED`, corresponding to whether or not `init_space_indices`
+has been run, to `v::Bool`.
+"""
+function set_initialized!(v::Bool)
+    INITIALIZED[] = v
+end
+
+"""
+    ionizationprofile(altitude, energy, energydis, pitchangle, pitchdis, massdensity) → ionprofile
 
 Compute ionization rate profile in pairs/el/cm as a function of `altitude` in km.
 
@@ -213,21 +223,23 @@ function massdensity(p, z)
 end
 
 """
-    neutralprofiles(lat, lon, z, dt::DateTime)
+    neutralprofiles(lat, lon, z, dt::DateTime; f107_window=3) → profiles_table
 
 Return `Table` of neutral atmosphere profiles and a boolean value if the `lat`, `lon` (deg)
 and UTC time `dt` is daytime. The profiles will be evaluated at heights `z` in km.
+
+`f107_window` is the number of days over which the F10.7 index is averaged.
 """
-function neutralprofiles(lat, lon, z, dt::DateTime)
+function neutralprofiles(lat, lon, z, dt::DateTime; f107_window=3)
     if !INITIALIZED[]
-        init_space_indices(enabled_files=[:fluxtable, :wdcfiles],
-            fluxtable_force_download=false, wdcfiles_force_download=false)
+        wdcfiles_oldest_year = min(year(now())-3, year(dt))
+        init_space_indices(;enabled_files=[:fluxtable, :wdcfiles], wdcfiles_oldest_year)
         INITIALIZED[] = true
     end
 
     lon = mod(lon, 360)
 
-    jd = DatetoJD(dt)
+    jd = date_to_jd(dt)
     sza = zenithangle(lat, lon, dt)
     
     g_lat = deg2rad(lat)
@@ -236,7 +248,7 @@ function neutralprofiles(lat, lon, z, dt::DateTime)
     h = z.*1000  # m
     p = nrlmsise00.(jd, h, g_lat, g_lon; output_si=true)  # #/m³
     
-    f107 = get_space_index(F10M(), jd)  # 81 day average. Doesn't match online exactly.
+    f107 = get_space_index(F10M(), jd; window=f107_window)
     nearest_f107 = FIRITools.values(:f10_7)[argmin(abs.(f107 .- FIRITools.values(:f10_7)))]
 
     Ne0 = firi(sza, lat; f10_7=nearest_f107, month=month(dt))
@@ -256,33 +268,33 @@ function neutralprofiles(lat, lon, z, dt::DateTime)
     # Sometimes a single (or maybe more?) height has NaN in MSIS. Not sure why...
     mask = isnan.(df.Tn)
     if any(mask)
-        itp1 = LinearInterpolation(df.h[.!mask], df.Tn[.!mask])
-        df.Tn .= itp1(df.h)
+        itp1 = interpolate(df.h[.!mask], df.Tn[.!mask], FritschButlandMonotonicInterpolation())
+        df.Tn .= itp1.(df.h)
     end
 
     mask .= isnan.(df.O)
     if any(mask)
-        itp2 = LinearInterpolation(df.h[.!mask], df.O[.!mask])
-        df.O .= itp2(df.h)
+        itp2 = interpolate(df.h[.!mask], df.O[.!mask], FritschButlandMonotonicInterpolation())
+        df.O .= itp2.(df.h)
     end
 
     mask .= isnan.(df.O2)
     if any(mask)
-        itp3 = LinearInterpolation(df.h[.!mask], df.O2[.!mask])
-        df.O2 .= itp3(df.h)
+        itp3 = interpolate(df.h[.!mask], df.O2[.!mask], FritschButlandMonotonicInterpolation())
+        df.O2 .= itp3.(df.h)
     end
 
     mask .= isnan.(df.N2)
     if any(mask)
-        itp4 = LinearInterpolation(df.h[.!mask], df.N2[.!mask])
-        df.N2 .= itp4(df.h)
+        itp4 = interpolate(df.h[.!mask], df.N2[.!mask], FritschButlandMonotonicInterpolation())
+        df.N2 .= itp4.(df.h)
     end
     
-    return df, isday(sza)
+    return df
 end
 
 """
-    chargeprofiles(flux, lat, lon, z, dt::DateTime; t=1e7)
+    chargeprofiles(flux, lat, lon, z, dt::DateTime; t=1e7) → (background_profiles, perturbed_profiles)
     chargeprofiles(flux, neutraltable, z, daytime::Bool; t=1e7)
 
 Compute GPI background and EPP-perturbed profiles for precipitating electron `flux` in
@@ -308,31 +320,25 @@ function chargeprofiles(flux, neutraltable, z, daytime::Bool; t=1e7)
 end
 
 function chargeprofiles(flux, lat, lon, z, dt::DateTime; t=1e7)
-    neutraltable, daytime = neutralprofiles(lat, lon, z, dt)
-    chargeprofiles(flux, neutraltable, z, daytime; t=t)
+    neutraltable = neutralprofiles(lat, lon, z, dt)
+    chargeprofiles(flux, neutraltable, z, isday(zenithangle(lat, lon, dt)); t=t)
 end
 
 """
-    chargeprofiles(lat, lon, z, dt::DateTime; t=1e7)
+    chargeprofiles(lat, lon, z, dt::DateTime; t=1e7) → background_profile
     chargeprofiles(neutraltable, z, daytime::Bool; t=1e7)
 
 Return the unperturbed (zero flux) GPI background profiles only.
 """
 function chargeprofiles(neutraltable, z, daytime::Bool; t=1e7)
-    # `md` must be defined at kilometer intervals, but the ionization profile can be at
-    # finer `z` steps
-    zstepped = first(z):last(z)
-    p = GPI.Profiles(neutraltable)
-    md = massdensity.((p,), zstepped)  # g/cm³
-
-    Nspec0, S = equilibrium(neutraltable, z, daytime; t=t)
+    Nspec0, _ = equilibrium(neutraltable, z, daytime; t=t)
 
     return Nspec0
 end
 
 function chargeprofiles(lat, lon, z, dt::DateTime; t=1e7)
-    neutraltable, daytime = neutralprofiles(lat, lon, z, dt)
-    chargeprofiles(neutraltable, z, daytime; t=t)
+    neutraltable = neutralprofiles(lat, lon, z, dt)
+    chargeprofiles(neutraltable, z, isday(zenithangle(lat, lon, dt)); t=t)
 end
     
 end # module
