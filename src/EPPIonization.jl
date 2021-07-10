@@ -223,7 +223,7 @@ function massdensity(p, z)
 end
 
 """
-    neutralprofiles(lat, lon, z, dt::DateTime) → (table, daytime)
+    neutralprofiles(lat, lon, z, dt::DateTime) → profiles_table
 
 Return `Table` of neutral atmosphere profiles and a boolean value if the `lat`, `lon` (deg)
 and UTC time `dt` is daytime. The profiles will be evaluated at heights `z` in km.
@@ -288,7 +288,7 @@ function neutralprofiles(lat, lon, z, dt::DateTime)
         df.N2 .= itp4.(df.h)
     end
     
-    return df, isday(sza)
+    return df
 end
 
 """
@@ -318,12 +318,12 @@ function chargeprofiles(flux, neutraltable, z, daytime::Bool; t=1e7)
 end
 
 function chargeprofiles(flux, lat, lon, z, dt::DateTime; t=1e7)
-    neutraltable, daytime = neutralprofiles(lat, lon, z, dt)
-    chargeprofiles(flux, neutraltable, z, daytime; t=t)
+    neutraltable = neutralprofiles(lat, lon, z, dt)
+    chargeprofiles(flux, neutraltable, z, isday(zenithangle(lat, lon, dt)); t=t)
 end
 
 """
-    chargeprofiles(lat, lon, z, dt::DateTime; t=1e7) → (background_profile, nothing)
+    chargeprofiles(lat, lon, z, dt::DateTime; t=1e7) → background_profile
     chargeprofiles(neutraltable, z, daytime::Bool; t=1e7)
 
 Return the unperturbed (zero flux) GPI background profiles only.
@@ -331,12 +331,12 @@ Return the unperturbed (zero flux) GPI background profiles only.
 function chargeprofiles(neutraltable, z, daytime::Bool; t=1e7)
     Nspec0, _ = equilibrium(neutraltable, z, daytime; t=t)
 
-    return Nspec0, nothing
+    return Nspec0
 end
 
 function chargeprofiles(lat, lon, z, dt::DateTime; t=1e7)
-    neutraltable, daytime = neutralprofiles(lat, lon, z, dt)
-    chargeprofiles(neutraltable, z, daytime; t=t)
+    neutraltable = neutralprofiles(lat, lon, z, dt)
+    chargeprofiles(neutraltable, z, isday(zenithangle(lat, lon, dt)); t=t)
 end
     
 end # module

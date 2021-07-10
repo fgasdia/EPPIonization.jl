@@ -2,7 +2,7 @@ using Test, EPPIonization
 using EPPIonization: datadir
 
 using DelimitedFiles, Dates
-
+using LMPTools
 
 function comparematlab()
     # electron energy
@@ -34,9 +34,9 @@ function profiles()
     lat, lon = 60, 258
     flux = 1e5
 
-    np, daytime = neutralprofiles(lat, lon, z, dt)
+    daytime = isday(zenithangle(lat, lon, dt))  # == false
 
-    @test daytime == false
+    np = neutralprofiles(lat, lon, z, dt)
 
     background1, perturbed1 = chargeprofiles(flux, lat, lon, z, dt)
     background2, perturbed2 = chargeprofiles(flux, np, z, daytime)
@@ -45,8 +45,8 @@ function profiles()
     @test perturbed1 == perturbed2
 
     # Zero-flux profiles
-    background5a, _ = chargeprofiles(lat, lon, z, dt)
-    background5b, _ = chargeprofiles(np, z, daytime)
+    background5a = chargeprofiles(lat, lon, z, dt)
+    background5b = chargeprofiles(np, z, daytime)
     background6, _ = chargeprofiles(0, lat, lon, z, dt)
 
     @test background5a == background5b
@@ -54,7 +54,7 @@ function profiles()
     
     # Non-integer steps
     zfine = 0:0.25:110
-    np, daytime = neutralprofiles(lat, lon, zfine, dt)
+    np = neutralprofiles(lat, lon, zfine, dt)
     background3, perturbed3 = chargeprofiles(flux, lat, lon, zfine, dt)
     background4, perturbed4 = chargeprofiles(flux, np, zfine, daytime)
     
