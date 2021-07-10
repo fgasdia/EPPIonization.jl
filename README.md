@@ -17,6 +17,8 @@ dt = DateTime(2020, 1, 1, 2, 30)
 lat, lon = 60, 258
 flux = 1e5  # electron flux in el/cm²/s
 
+daytime = isday(zenithangle(lat, lon, dt))
+
 # Compute table of profiles `np` with columns of height `h` in kilometers,
 # electron density `Ne` in m⁻³ from FIRITools.jl,
 # neutral temperature `Tn` in Kelvin, and densities of neutral `O`, `N2`, and `O2` in m⁻³,
