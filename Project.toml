@@ -19,7 +19,7 @@ FIRITools = "0.0.4"
 GPI = "0.0.2"
 GeographicLib = "0.4"
 HDF5 = "0.15"
-Interpolations = "0.13"
+Interpolations = "= 0.13.2"  # Until a bug is fixed in SatelliteToolbox.jl v0.9
 LMPTools = "0.0.7"
 SatelliteToolbox = "0.9"
 TypedTables = "1.2"
