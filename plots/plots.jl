@@ -2,7 +2,7 @@ using DelimitedFiles, Dates
 using EPPIonization
 using Plots
 
-using EPPIonization: datadir, massdensity, SPECIES
+using EPPIonization: datadir, massdensity, SPECIES, isday, zenithangle
 
 mask(x) = x < 1 ? NaN : x
 
@@ -11,7 +11,7 @@ function neutralprofileplot()
     dt = DateTime(2020, 1, 1, 2, 30)
     lat, lon = 60, 258
     
-    np, _ = neutralprofiles(lat, lon, z, dt)
+    np = neutralprofiles(lat, lon, z, dt)
 
     plot(xlabel="Number density (m⁻³)", ylabel="Altitude (km)",
          xscale=:log10, ylims=(0, 115))
@@ -26,7 +26,7 @@ function massdensityplot()
     dt = DateTime(2020, 1, 1, 2, 30)
     lat, lon = 60, 258
     
-    np, _ = neutralprofiles(lat, lon, z, dt)
+    np = neutralprofiles(lat, lon, z, dt)
     md = massdensity.((np,), z)  # g/cm³
 
     plot(md/1000, z, label="MSIS",
@@ -47,7 +47,7 @@ function ionizationrateplot()
     pitchdis = ones(length(pitchangle))
     flux = 1e5
 
-    np, _ = neutralprofiles(lat, lon, z, dt)
+    np = neutralprofiles(lat, lon, z, dt)
     zstepped = first(z):last(z)
     md = massdensity.((np,), zstepped)  # g/cm³
 
@@ -61,16 +61,16 @@ end
 
 function chargeprofileplot(daytime::Bool)
     z = 0:110
-    lat, lon = 60, 258
+    lat, lon = 55, 248
     flux = 1e5
 
     if daytime
-        dt = DateTime(2020, 1, 1, 18, 30)
+        dt = DateTime(2020, 3, 1, 18)
     else
-        dt = DateTime(2020, 1, 1, 2, 30)
+        dt = DateTime(2020, 3, 1, 8)
     end
 
-    np, daytime = neutralprofiles(lat, lon, z, dt)
+    np = neutralprofiles(lat, lon, z, dt)
     cp0, cp = chargeprofiles(flux, np, z, daytime)
 
     lws = fill(1.2, (1, length(SPECIES)))
@@ -99,7 +99,6 @@ function fineprofileplot(daytime::Bool)
         dt = DateTime(2020, 1, 1, 2, 30)
     end
 
-    npf, daytime = neutralprofiles(lat, lon, zfine, dt)
     cp0, cp = chargeprofiles(flux, lat, lon, z, dt)
     cp0f, cpf = chargeprofiles(flux, lat, lon, zfine, dt)
 
