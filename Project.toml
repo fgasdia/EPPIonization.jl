@@ -1,7 +1,7 @@
 name = "EPPIonization"
 uuid = "1f1cae16-1f2d-462a-a280-9fd812a581a0"
 authors = ["fgasdia <fgasdia@noreply.github.com>"]
-version = "0.0.6"
+version = "0.0.7"
 
 [deps]
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
@@ -15,6 +15,7 @@ SatelliteToolbox = "6ac157d9-b43d-51bb-8fab-48bf53814f4a"
 TypedTables = "9d95f2ec-7b3d-5a63-8d20-e2491e220bb9"
 
 [compat]
+julia = "1.6"
 FIRITools = "0.0.4"
 GPI = "0.0.2"
 GeographicLib = "0.4"
