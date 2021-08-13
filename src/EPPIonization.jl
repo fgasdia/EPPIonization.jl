@@ -5,7 +5,7 @@ using Interpolations, HDF5, TypedTables
 using SatelliteToolbox
 using GPI, FIRITools, LMPTools
 
-export ionizationprofile, neutralprofiles, chargeprofiles
+export ionizationprofile, neutralprofiles, chargeprofiles, EnergeticElectrons
 
 const SPECIES = GPI.SPECIES
 const INITIALIZED = Ref{Bool}(false)
@@ -24,6 +24,28 @@ function readlut()
 end
 
 """
+    EnergeticElectrons
+
+Describe the energy and pitch angle distribution of energetic precipitating electrons.
+
+# Example
+```julia
+energy = 90e3:1e4:2.2e6  # 90 keV to 2.2 MeV every 10 keV
+energydis = exp.(-energy/2e5)  # f(E) = exp(-E/β) where β ranges from 100 to 300 keV (Whittaker, 2013)
+pitchangle = 0:90
+pitchdis = ones(length(pitchangle))
+
+ee = EnergeticElectrons(energy, energydis, pitchangle, pitchangledis)
+````
+"""
+struct EnergeticElectrons{T1,T2}
+    energy::T1
+    energydis::Vector{Float64}
+    pitchangle::T2
+    pitchangledis::Vector{Float64}
+end
+
+"""
     set_initialized!(::Bool)
 
 Force the global variable `INITIALIZED`, corresponding to whether or not `init_space_indices`
@@ -34,7 +56,8 @@ function set_initialized!(v::Bool)
 end
 
 """
-    ionizationprofile(altitude, energy, energydis, pitchangle, pitchdis, massdensity) → ionprofile
+    ionizationprofile(ee, massdensity, altitude) → ionizationprofile
+    ionizationprofile(energy, energydis, pitchangle, pitchdis, massdensity, altitude) → ionizationprofile
 
 Compute ionization rate profile in pairs/el/cm as a function of `altitude` in km.
 
@@ -43,6 +66,7 @@ source precipitating electron flux in el/cm²/s.
 
 # Arguments
 
+    - `ee`: `EnergeticElectrons`
     - `altitude` [km]: altitude vector
     - `energy` [eV]: electron energy between ~3 keV and ~33 MeV
     - `energydis`: energy distribution of precipitating electrons
@@ -54,14 +78,19 @@ source precipitating electron flux in el/cm²/s.
 # Example
 
 ```julia
-energy = 10.^(4:0.01:7);
+alt = 0:100;
+energy = 90e3:1e4:2.2e6  # 90 keV to 2.2 MeV every 10 keV
 energydis = exp.(-energy/1e5);  # e.g.: f(E) ∝ exp(-E/100 keV)
 pitchangle = 0:90;
 pitchdis = ones(length(pitchangle));
-ion = ionizationprofile(alt, energy, energydis, pitchangle, pitchdis, massdensity);
+ion = ionizationprofile(energy, energydis, pitchangle, pitchdis, massdensity, alt);
 ```
 """
-function ionizationprofile(altitude, energy, energydis, pitchangle, pitchdis, massdensity)
+function ionizationprofile(ee, massdensity, altitude)
+    ionizationprofile(ee.energy, ee.energydis, ee.pitchangle, ee.pitchangledis, massdensity, altitude)
+end
+
+function ionizationprofile(energy, energydis, pitchangle, pitchdis, massdensity, altitude)
     maximum(altitude) > 500 && throw(ArgumentError("`altitude` should not exceed 500 km"))
 
     en, pa, ion, masden, alt = readlut()
@@ -78,7 +107,8 @@ function ionizationprofile(altitude, energy, energydis, pitchangle, pitchdis, ma
     den = diff(edge)
 
     # initialize for lookupconvert
-    alt2 = alt .+ 0.5  # == (alt .+ (alt .+ 1))./2
+    alt2 = alt .+ 0.5
+    @assert alt2 == (alt .+ (alt .+ 1))./2
     do_itp = LinearInterpolation(alt, log.(view(masden, mask)), extrapolation_bc=Line())
     denold = exp.(do_itp(alt2))
     reverse!(denold)
@@ -294,34 +324,34 @@ function neutralprofiles(lat, lon, z, dt::DateTime; f107_window=3)
 end
 
 """
-    chargeprofiles(flux, lat, lon, z, dt::DateTime; t=1e7) → (background_profiles, perturbed_profiles)
-    chargeprofiles(flux, neutraltable, z, daytime::Bool; t=1e7)
+    chargeprofiles(flux, lat, lon, ee, z, dt::DateTime; t=1e7) → (background_profiles, perturbed_profiles)
+    chargeprofiles(flux, ee, neutraltable, z, daytime::Bool; t=1e7)
 
 Compute GPI background and EPP-perturbed profiles for precipitating electron `flux` in
-el/cm²/s, `lat` and `lon` in degrees, heights `z`, and time `dt`.
+el/cm²/s, `lat` and `lon` in degrees, heights `z` in kilometers, and time `dt`.
 """
-function chargeprofiles(flux, neutraltable, z, daytime::Bool; t=1e7)
-    energy = 90e3:1e4:2.2e6  # eV; 90 keV to 2.2 MeV every 10 keV
-    energydis = exp.(-energy/2e5)  # f(E) ∝ exp(-E/β) where β ranges from 100 to 300 keV
-    pitchangle = 0:90
-    pitchdis = ones(length(pitchangle))
+function chargeprofiles(flux, ee, neutraltable, z, daytime::Bool; t=1e7)
+    if iszero(flux)
+        Nspec0 = chargeprofiles(neutraltable, z, daytime; t)
+        return Nspec0, similar(Nspec0, 0, 0)  # return an empty matrix for Nspec
+    end
 
     # `md` must be defined at kilometer intervals, but the ionization profile can be at
     # finer `z` steps
     zstepped = first(z):last(z)
     p = GPI.Profiles(neutraltable)
     md = massdensity.((p,), zstepped)  # g/cm³
-    S = ionizationprofile(z, energy, energydis, pitchangle, pitchdis, md/1000)*1e6
+    S = ionizationprofile(ee, md/1000, z)*1e6
     S *= flux
 
-    Nspec0, Nspec = gpi(neutraltable, z, daytime, S; t=t)
+    Nspec0, Nspec = gpi(neutraltable, z, daytime, S; t)
 
     return Nspec0, Nspec
 end
 
-function chargeprofiles(flux, lat, lon, z, dt::DateTime; t=1e7)
+function chargeprofiles(flux, lat, lon, ee, z, dt::DateTime; t=1e7)
     neutraltable = neutralprofiles(lat, lon, z, dt)
-    chargeprofiles(flux, neutraltable, z, isday(zenithangle(lat, lon, dt)); t=t)
+    chargeprofiles(flux, ee, neutraltable, z, isday(zenithangle(lat, lon, dt)); t)
 end
 
 """
@@ -331,14 +361,14 @@ end
 Return the unperturbed (zero flux) GPI background profiles only.
 """
 function chargeprofiles(neutraltable, z, daytime::Bool; t=1e7)
-    Nspec0, _ = equilibrium(neutraltable, z, daytime; t=t)
+    Nspec0, _ = equilibrium(neutraltable, z, daytime; t)
 
     return Nspec0
 end
 
 function chargeprofiles(lat, lon, z, dt::DateTime; t=1e7)
     neutraltable = neutralprofiles(lat, lon, z, dt)
-    chargeprofiles(neutraltable, z, isday(zenithangle(lat, lon, dt)); t=t)
+    chargeprofiles(neutraltable, z, isday(zenithangle(lat, lon, dt)); t)
 end
     
 end # module
