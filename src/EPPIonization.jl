@@ -36,7 +36,7 @@ pitchangle = 0:90
 pitchdis = ones(length(pitchangle))
 
 ee = EnergeticElectrons(energy, energydis, pitchangle, pitchangledis)
-````
+```
 """
 struct EnergeticElectrons{T1,T2}
     energy::T1
