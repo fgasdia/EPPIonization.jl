@@ -1,7 +1,7 @@
 name = "EPPIonization"
 uuid = "1f1cae16-1f2d-462a-a280-9fd812a581a0"
 authors = ["fgasdia <fgasdia@noreply.github.com>"]
-version = "0.0.7"
+version = "0.0.8"
 
 [deps]
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"

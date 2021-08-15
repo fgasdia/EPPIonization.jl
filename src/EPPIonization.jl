@@ -333,7 +333,7 @@ el/cm²/s, `lat` and `lon` in degrees, heights `z` in kilometers, and time `dt`.
 function chargeprofiles(flux, ee, neutraltable, z, daytime::Bool; t=1e7)
     if iszero(flux)
         Nspec0 = chargeprofiles(neutraltable, z, daytime; t)
-        return Nspec0, similar(Nspec0, 0, 0)  # return an empty matrix for Nspec
+        return Nspec0, copy(Nspec0)
     end
 
     # `md` must be defined at kilometer intervals, but the ionization profile can be at
