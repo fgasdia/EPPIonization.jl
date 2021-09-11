@@ -341,10 +341,10 @@ function chargeprofiles(flux, ee, neutraltable, z, daytime::Bool; t=1e7)
     zstepped = first(z):last(z)
     p = GPI.Profiles(neutraltable)
     md = massdensity.((p,), zstepped)  # g/cm³
-    S = ionizationprofile(ee, md/1000, z)*1e6
-    S *= flux
+    S = ionizationprofile(ee, md/1000, z)  # pairs/el/cm
+    S *= flux  # pairs/cm³/s
 
-    Nspec0, Nspec = gpi(neutraltable, z, daytime, S; t)
+    Nspec0, Nspec = gpi(neutraltable, z, daytime, S*1e6; t)  # convert ionization to pairs/m³/s
 
     return Nspec0, Nspec
 end
