@@ -328,7 +328,8 @@ end
     chargeprofiles(flux, ee, neutraltable, z, daytime::Bool; t=1e7)
 
 Compute GPI background and EPP-perturbed profiles for precipitating electron `flux` in
-el/cm²/s, `lat` and `lon` in degrees, heights `z` in kilometers, and time `dt`.
+el/cm²/s, `lat` and `lon` in degrees, heights `z` in kilometers, and time `dt` for
+`EnergeticElectrons` specified by `ee`.
 """
 function chargeprofiles(flux, ee, neutraltable, z, daytime::Bool; t=1e7)
     if iszero(flux)
