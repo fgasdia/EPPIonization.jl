@@ -33,7 +33,7 @@ Describe the energy and pitch angle distribution of energetic precipitating elec
 energy = 90e3:1e4:2.2e6  # 90 keV to 2.2 MeV every 10 keV
 energydis = exp.(-energy/2e5)  # f(E) = exp(-E/β) where β ranges from 100 to 300 keV (Whittaker, 2013)
 pitchangle = 0:90
-pitchdis = ones(length(pitchangle))
+pitchangledis = ones(length(pitchangle))
 
 ee = EnergeticElectrons(energy, energydis, pitchangle, pitchangledis)
 ```
