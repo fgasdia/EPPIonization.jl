@@ -253,17 +253,21 @@ function massdensity(p, z)
 end
 
 """
-    neutralprofiles(lat, lon, z, dt::DateTime; f107_window=3) → profiles_table
+    neutralprofiles(lat, lon, z, dt::DateTime; f107_window=3, datafilepath=nothing) → profiles_table
 
 Return `Table` of neutral atmosphere profiles and a boolean value if the `lat`, `lon` (deg)
 and UTC time `dt` is daytime. The profiles will be evaluated at heights `z` in km.
 
 `f107_window` is the number of days over which the F10.7 index is averaged.
+
+`datafilepath` is an optional directory pointing to wdc and fluxtable files. See
+    documentation for `SatelliteToolbox.init_space_indices`.
 """
-function neutralprofiles(lat, lon, z, dt::DateTime; f107_window=3)
+function neutralprofiles(lat, lon, z, dt::DateTime; f107_window=3, datafilepath=nothing)
     if !INITIALIZED[]
         wdcfiles_oldest_year = min(year(now())-3, year(dt))
-        init_space_indices(;enabled_files=[:fluxtable, :wdcfiles], wdcfiles_oldest_year)
+        init_space_indices(;wdcfiles_dir=datafilepath,
+            enabled_files=[:fluxtable, :wdcfiles], wdcfiles_oldest_year)
         INITIALIZED[] = true
     end
 
@@ -324,7 +328,7 @@ function neutralprofiles(lat, lon, z, dt::DateTime; f107_window=3)
 end
 
 """
-    chargeprofiles(flux, lat, lon, ee, z, dt::DateTime; t=1e7) → (background_profiles, perturbed_profiles)
+    chargeprofiles(flux, lat, lon, ee, z, dt::DateTime; t=1e7, datafilepath=nothing) → (background_profiles, perturbed_profiles)
     chargeprofiles(flux, ee, neutraltable, z, daytime::Bool; t=1e7)
 
 Compute GPI background and EPP-perturbed profiles for precipitating electron `flux` in
@@ -333,7 +337,7 @@ el/cm²/s, `lat` and `lon` in degrees, heights `z` in kilometers, and time `dt` 
 """
 function chargeprofiles(flux, ee, neutraltable, z, daytime::Bool; t=1e7)
     if iszero(flux)
-        Nspec0 = chargeprofiles(neutraltable, z, daytime; t)
+        Nspec0 = chargeprofiles(neutraltable, z, daytime; t, datafilepath)
         return Nspec0, copy(Nspec0)
     end
 
@@ -350,13 +354,13 @@ function chargeprofiles(flux, ee, neutraltable, z, daytime::Bool; t=1e7)
     return Nspec0, Nspec
 end
 
-function chargeprofiles(flux, lat, lon, ee, z, dt::DateTime; t=1e7)
-    neutraltable = neutralprofiles(lat, lon, z, dt)
-    chargeprofiles(flux, ee, neutraltable, z, isday(zenithangle(lat, lon, dt)); t)
+function chargeprofiles(flux, lat, lon, ee, z, dt::DateTime; t=1e7, datafilepath=nothing)
+    neutraltable = neutralprofiles(lat, lon, z, dt; datafilepath)
+    chargeprofiles(flux, ee, neutraltable, z, isday(zenithangle(lat, lon, dt)); t, datafilepath)
 end
 
 """
-    chargeprofiles(lat, lon, z, dt::DateTime; t=1e7) → background_profile
+    chargeprofiles(lat, lon, z, dt::DateTime; t=1e7, datafilepath=nothing) → background_profile
     chargeprofiles(neutraltable, z, daytime::Bool; t=1e7)
 
 Return the unperturbed (zero flux) GPI background profiles only.
@@ -367,8 +371,8 @@ function chargeprofiles(neutraltable, z, daytime::Bool; t=1e7)
     return Nspec0
 end
 
-function chargeprofiles(lat, lon, z, dt::DateTime; t=1e7)
-    neutraltable = neutralprofiles(lat, lon, z, dt)
+function chargeprofiles(lat, lon, z, dt::DateTime; t=1e7, datafilepath=nothing)
+    neutraltable = neutralprofiles(lat, lon, z, dt; datafilepath)
     chargeprofiles(neutraltable, z, isday(zenithangle(lat, lon, dt)); t)
 end
     
