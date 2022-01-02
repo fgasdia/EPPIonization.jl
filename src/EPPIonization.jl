@@ -337,7 +337,7 @@ el/cm²/s, `lat` and `lon` in degrees, heights `z` in kilometers, and time `dt` 
 """
 function chargeprofiles(flux, ee, neutraltable, z, daytime::Bool; t=1e7)
     if iszero(flux)
-        Nspec0 = chargeprofiles(neutraltable, z, daytime; t, datafilepath)
+        Nspec0 = chargeprofiles(neutraltable, z, daytime; t)
         return Nspec0, copy(Nspec0)
     end
 
@@ -356,7 +356,7 @@ end
 
 function chargeprofiles(flux, lat, lon, ee, z, dt::DateTime; t=1e7, datafilepath=nothing)
     neutraltable = neutralprofiles(lat, lon, z, dt; datafilepath)
-    chargeprofiles(flux, ee, neutraltable, z, isday(zenithangle(lat, lon, dt)); t, datafilepath)
+    chargeprofiles(flux, ee, neutraltable, z, isday(zenithangle(lat, lon, dt)); t)
 end
 
 """
