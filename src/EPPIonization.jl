@@ -334,6 +334,9 @@ end
 Compute GPI background and EPP-perturbed profiles for precipitating electron `flux` in
 el/cm²/s, `lat` and `lon` in degrees, heights `z` in kilometers, and time `dt` for
 `EnergeticElectrons` specified by `ee`.
+
+`datafilepath` is an optional directory pointing to wdc and fluxtable files. See
+    documentation for `SatelliteToolbox.init_space_indices`.
 """
 function chargeprofiles(flux, ee, neutraltable, z, daytime::Bool; t=1e7)
     if iszero(flux)
@@ -364,6 +367,9 @@ end
     chargeprofiles(neutraltable, z, daytime::Bool; t=1e7)
 
 Return the unperturbed (zero flux) GPI background profiles only.
+
+`datafilepath` is an optional directory pointing to wdc and fluxtable files. See
+    documentation for `SatelliteToolbox.init_space_indices`.
 """
 function chargeprofiles(neutraltable, z, daytime::Bool; t=1e7)
     Nspec0, _ = equilibrium(neutraltable, z, daytime; t)

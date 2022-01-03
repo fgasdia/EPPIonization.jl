@@ -71,7 +71,32 @@ function profiles()
     @test background2 ≈ background4[1:4:end,:] rtol=0.01
 end
 
+function extraarguments()
+    z = 0:110
+    dt = DateTime(2020, 1, 1, 2, 30)
+    lat, lon = 60, 258
+    flux = 1e5
+
+    daytime = isday(zenithangle(lat, lon, dt))  # == false
+
+    energy = 90e3:1e4:2.2e6  # 90 keV to 2.2 MeV every 10 keV
+    energydis = exp.(-energy/1e5)  # e.g.: f(E) ∝ exp(-E/100 keV)
+    pitchangle = 0:90
+    pitchdis = ones(length(pitchangle))
+    ee = EnergeticElectrons(energy, energydis, pitchangle, pitchdis)
+
+    # Accuracy check
+    np = neutralprofiles(lat, lon, z, dt)
+    npf = neutralprofiles(lat, lon, z, dt; datafilepath="wdc")
+    @test npf == np
+
+    # Smoke tests
+    @test chargeprofiles(flux, lat, lon, ee, z, dt; datafilepath="wdc") isa Tuple{<:Matrix,<:Matrix}
+    @test chargeprofiles(lat, lon, z, dt; datafilepath="wdc") isa Matrix
+end
+
 @testset "EPPIonization" begin
     comparematlab()
     profiles()
+    extraarguments()
 end
