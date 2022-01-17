@@ -253,17 +253,15 @@ function massdensity(p, z)
 end
 
 """
-    neutralprofiles(lat, lon, z, dt::DateTime; f107_window=3, datafilepath=nothing) → profiles_table
+    neutralprofiles(lat, lon, z, dt::DateTime; datafilepath=nothing) → profiles_table
 
 Return `Table` of neutral atmosphere profiles and a boolean value if the `lat`, `lon` (deg)
 and UTC time `dt` is daytime. The profiles will be evaluated at heights `z` in km.
 
-`f107_window` is the number of days over which the F10.7 index is averaged.
-
 `datafilepath` is an optional directory pointing to wdc and fluxtable files. See
     documentation for `SatelliteToolbox.init_space_indices`.
 """
-function neutralprofiles(lat, lon, z, dt::DateTime; f107_window=3, datafilepath=nothing)
+function neutralprofiles(lat, lon, z, dt::DateTime; datafilepath=nothing)
     if !INITIALIZED[]
         wdcfiles_oldest_year = min(year(now())-3, year(dt))
         init_space_indices(;wdcfiles_dir=datafilepath,
@@ -282,7 +280,7 @@ function neutralprofiles(lat, lon, z, dt::DateTime; f107_window=3, datafilepath=
     h = z.*1000  # m
     p = nrlmsise00.(jd, h, g_lat, g_lon; output_si=true)  # #/m³
     
-    f107 = get_space_index(F10M(), jd; window=f107_window)
+    f107 = get_space_index(F10(), jd)
     nearest_f107 = FIRITools.values(:f10_7)[argmin(abs.(f107 .- FIRITools.values(:f10_7)))]
 
     Ne0 = firi(sza, lat; f10_7=nearest_f107, month=month(dt))
