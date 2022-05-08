@@ -16,9 +16,9 @@ TypedTables = "9d95f2ec-7b3d-5a63-8d20-e2491e220bb9"
 
 [compat]
 FIRITools = "0.0.4, 0.1"
-GPI = "0.0.2"
+GPI = "0.0.2,0.0.3"
 GeographicLib = "0.4"
-HDF5 = "0.15"
+HDF5 = "0.15,0.16"
 Interpolations = "0.13.3"
 LMPTools = "0.0.7 - 0.0.9, 0.1, 0.2"
 SatelliteToolbox = "0.9.1"
