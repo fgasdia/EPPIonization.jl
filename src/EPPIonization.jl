@@ -3,7 +3,8 @@ module EPPIonization
 using Dates
 using Interpolations, HDF5, TypedTables
 using SatelliteToolbox
-using GPI, FIRITools, LMPTools
+using GPI, FaradayInternationalReferenceIonosphere, LMPTools
+import FaradayInternationalReferenceIonosphere as FIRI
 
 export ionizationprofile, neutralprofiles, chargeprofiles, EnergeticElectrons
 
@@ -281,10 +282,10 @@ function neutralprofiles(lat, lon, z, dt::DateTime; datafilepath=nothing)
     p = nrlmsise00.(jd, h, g_lat, g_lon; output_si=true)  # #/m³
     
     f107 = get_space_index(F10(), jd)
-    nearest_f107 = FIRITools.values(:f10_7)[argmin(abs.(f107 .- FIRITools.values(:f10_7)))]
+    nearest_f107 = FIRI.values(:f10_7)[argmin(abs.(f107 .- FIRI.values(:f10_7)))]
 
     Ne0 = firi(sza, lat; f10_7=nearest_f107, month=month(dt))
-    Ne = FIRITools.extrapolate(Ne0, h)
+    Ne = FIRI.extrapolate(Ne0, h)
     # With specified f10_7 and month, there is only 1 profile after interpolation
 
     # Comprehension is more type-stable than `getfield.(p, :T_alt)` (if `:h` isn't Float64)
