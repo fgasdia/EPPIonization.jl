@@ -36,8 +36,8 @@ bp, epp = chargeprofiles(flux, np, z, daytime)
 
 ## Citations
 
-This code is based on
+This code is based on:
 
-    Xu, Wei, Marshall, Robert A, Tyssoy, Hilde Nesse, & Fang, Xiaohua. (2020). A Generalized Method for Calculating Atmospheric Ionization by Energetic Electron Precipitation. https://doi.org/10.5281/zenodo.3945306
+Xu, Wei, Marshall, Robert A, Tyssoy, Hilde Nesse, & Fang, Xiaohua. (2020). A Generalized Method for Calculating Atmospheric Ionization by Energetic Electron Precipitation. https://doi.org/10.5281/zenodo.3945306
 
 The original Matlab source code is available at https://zenodo.org/record/3945306 under [Creative Commons Attribution 4.0 International](https://creativecommons.org/licenses/by/4.0/legalcode) license.
