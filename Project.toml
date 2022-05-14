@@ -15,7 +15,6 @@ SatelliteToolbox = "6ac157d9-b43d-51bb-8fab-48bf53814f4a"
 TypedTables = "9d95f2ec-7b3d-5a63-8d20-e2491e220bb9"
 
 [compat]
-FaradayInternationalReferenceIonosphere = "0.0.4, 0.1, 0.2"
 GPI = "0.0.2,0.0.3"
 GeographicLib = "0.4"
 HDF5 = "0.15,0.16"
