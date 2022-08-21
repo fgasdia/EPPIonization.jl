@@ -90,6 +90,10 @@ function extraarguments()
     npf = neutralprofiles(lat, lon, z, dt; datafilepath="wdc")
     @test npf == np
 
+    cp = chargeprofiles(flux, lat, lon, ee, z, dt)
+    cpf = chargeprofiles(flux, lat, lon, ee, z, dt; datafilepath="wdc")
+    @test cp == cpf
+    
     # Smoke tests
     @test chargeprofiles(flux, lat, lon, ee, z, dt; datafilepath="wdc") isa Tuple{<:Matrix,<:Matrix}
     @test chargeprofiles(lat, lon, z, dt; datafilepath="wdc") isa Matrix
