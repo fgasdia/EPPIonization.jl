@@ -123,7 +123,7 @@ function ionizationprofile(energy, energydis, pitchangle, pitchdis, massdensity,
     # initialize for lookupconvert
     alt2 = alt .+ 0.5
     @assert alt2 == (alt .+ (alt .+ 1))./2
-    do_itp = LinearInterpolation(alt, log.(view(masden, mask)), extrapolation_bc=Line())
+    do_itp = linear_interpolation(alt, log.(view(masden, mask)), extrapolation_bc=Line())
     denold = exp.(do_itp(alt2))
     reverse!(denold)
 
@@ -139,11 +139,11 @@ function ionizationprofile(energy, energydis, pitchangle, pitchdis, massdensity,
     enind = findall(x->minimum(energy) <= x <= maximum(energy), en)
 
     # interpolate in energy
-    en_itp = LinearInterpolation(energy, energydis, extrapolation_bc=Line())
+    en_itp = linear_interpolation(energy, energydis, extrapolation_bc=Line())
     enint = en_itp(view(en,enind))
 
     # interpolate in pitch angle
-    pa_itp = LinearInterpolation(pitchangle, pitchdis)
+    pa_itp = linear_interpolation(pitchangle, pitchdis)
     paint = pa_itp(pa)
 
     # normalize in energy 
@@ -162,7 +162,7 @@ function ionizationprofile(energy, energydis, pitchangle, pitchdis, massdensity,
         ionnew .+= (endis[i]*den[enind[i]]).*ionen[i,:]
     end
 
-    @views ion_itp = LinearInterpolation(alt[1:end-1], log.(ionnew[1:end-1]), extrapolation_bc=Line())
+    @views ion_itp = linear_interpolation(alt[1:end-1], log.(ionnew[1:end-1]), extrapolation_bc=Line())
     ionpro = exp.(ion_itp(altitude))
     replace!(ionpro, NaN=>0)
 
@@ -178,8 +178,8 @@ function lookupconvert!(ionnew, denold, ionold1, dennew1, alt, alt2)
     denold = copy(denold)  # it's mutated below
 
     # calculate ionization rate at half grid cells
-    io_itp = LinearInterpolation(alt, log.(ionold1), extrapolation_bc=Line())
-    dn_itp = LinearInterpolation(alt, log.(dennew1), extrapolation_bc=Line())
+    io_itp = linear_interpolation(alt, log.(ionold1), extrapolation_bc=Line())
+    dn_itp = linear_interpolation(alt, log.(dennew1), extrapolation_bc=Line())
     ionold = exp.(io_itp(alt2))
     dennew = exp.(dn_itp(alt2))
 
@@ -217,7 +217,7 @@ function lookupconvert!(ionnew, denold, ionold1, dennew1, alt, alt2)
     intind = findfirst(>(denold[3]), dennew)
     if !isnothing(intind)
         # intind == 1
-        min_itp = LinearInterpolation(log.(view(denold, 3:minaltold)),
+        min_itp = linear_interpolation(log.(view(denold, 3:minaltold)),
                                       log.(view(ionold, 3:minaltold)),
                                       extrapolation_bc=Line())
         ionnew_csum[intind:minaltnew] .= exp.(min_itp(log.(view(dennew, intind:minaltnew))))
@@ -225,7 +225,7 @@ function lookupconvert!(ionnew, denold, ionold1, dennew1, alt, alt2)
         if intind > 1
             uniqueval = unique(ionold)
             uniind = findfirst(isequal(uniqueval[end]), ionold)
-            uni_itp = LinearInterpolation(view(denold, 3:uniind),
+            uni_itp = linear_interpolation(view(denold, 3:uniind),
                                           view(ionold, 3:uniind),
                                           extrapolation_bc=Line())
             
