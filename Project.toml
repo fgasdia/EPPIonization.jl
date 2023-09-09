@@ -17,11 +17,15 @@ SpaceIndices = "5a540a4e-639f-452a-b107-23ea09ed4d36"
 TypedTables = "9d95f2ec-7b3d-5a63-8d20-e2491e220bb9"
 
 [compat]
+FaradayInternationalReferenceIonosphere = "0.2"
 GPI = "0.0.5"
 GeographicLib = "0.4"
 HDF5 = "0.15 - 0.17"
-Interpolations = "0.14"
+Interpolations = "0.14.4"
 LMPTools = "0.2"
+SatelliteToolboxAtmosphericModels = "0.1"
+SatelliteToolboxBase = "0.3"
+SpaceIndices = "1"
 TypedTables = "1.2"
 julia = "1.7.1"
 
