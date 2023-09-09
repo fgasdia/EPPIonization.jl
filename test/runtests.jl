@@ -30,7 +30,7 @@ end
 
 function profiles()
     z = 0:110
-    dt = DateTime(2020, 1, 1, 2, 30)
+    dt = DateTime(2021, 1, 1, 2, 30)
     lat, lon = 60, 258
     flux = 1e5
 
@@ -73,7 +73,7 @@ end
 
 function extraarguments()
     z = 0:110
-    dt = DateTime(2020, 1, 1, 2, 30)
+    dt = DateTime(2021, 1, 1, 2, 30)
     lat, lon = 60, 258
     flux = 1e5
 
@@ -85,18 +85,10 @@ function extraarguments()
     pitchdis = ones(length(pitchangle))
     ee = EnergeticElectrons(energy, energydis, pitchangle, pitchdis)
 
-    # Accuracy check
-    np = neutralprofiles(lat, lon, z, dt)
-    npf = neutralprofiles(lat, lon, z, dt; datafilepath="wdc")
-    @test npf == np
-
-    cp = chargeprofiles(flux, lat, lon, ee, z, dt)
-    cpf = chargeprofiles(flux, lat, lon, ee, z, dt; datafilepath="wdc")
-    @test cp == cpf
-    
     # Smoke tests
-    @test chargeprofiles(flux, lat, lon, ee, z, dt; datafilepath="wdc") isa Tuple{<:Matrix,<:Matrix}
-    @test chargeprofiles(lat, lon, z, dt; datafilepath="wdc") isa Matrix
+    np = neutralprofiles(lat, lon, z, dt)
+    @test chargeprofiles(flux, lat, lon, ee, z, dt) isa Tuple{<:Matrix,<:Matrix}
+    @test chargeprofiles(lat, lon, z, dt) isa Matrix
 end
 
 @testset "EPPIonization" begin

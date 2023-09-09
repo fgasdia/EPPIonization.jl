@@ -15,7 +15,7 @@ module EPPIonization
 
 using Dates
 using Interpolations, HDF5, TypedTables
-using SatelliteToolbox
+using SpaceIndices, SatelliteToolboxBase, SatelliteToolboxAtmosphericModels
 using GPI, FaradayInternationalReferenceIonosphere, LMPTools
 import FaradayInternationalReferenceIonosphere as FIRI
 
@@ -62,7 +62,7 @@ end
 """
     set_initialized!(::Bool)
 
-Force the global variable `INITIALIZED`, corresponding to whether or not `init_space_indices`
+Force the global variable `INITIALIZED`, corresponding to whether or not `SpaceIndices.init`
 has been run, to `v::Bool`.
 """
 function set_initialized!(v::Bool)
@@ -267,19 +267,14 @@ function massdensity(p, z)
 end
 
 """
-    neutralprofiles(lat, lon, z, dt::DateTime; datafilepath=nothing) → profiles_table
+    neutralprofiles(lat, lon, z, dt::DateTime) → profiles_table
 
 Return `Table` of neutral atmosphere profiles and a boolean value if the `lat`, `lon` (deg)
 and UTC time `dt` is daytime. The profiles will be evaluated at heights `z` in km.
-
-`datafilepath` is an optional directory pointing to wdc and fluxtable files. See
-    documentation for `SatelliteToolbox.init_space_indices`.
 """
-function neutralprofiles(lat, lon, z, dt::DateTime; datafilepath=nothing)
+function neutralprofiles(lat, lon, z, dt::DateTime)
     if !INITIALIZED[]
-        wdcfiles_oldest_year = min(year(now())-3, year(dt))
-        init_space_indices(;wdcfiles_dir=datafilepath,
-            enabled_files=[:fluxtable, :wdcfiles], wdcfiles_oldest_year)
+        SpaceIndices.init()
         INITIALIZED[] = true
     end
 
@@ -292,9 +287,9 @@ function neutralprofiles(lat, lon, z, dt::DateTime; datafilepath=nothing)
     g_lon = deg2rad(lon)
     
     h = z.*1000  # m
-    p = nrlmsise00.(jd, h, g_lat, g_lon; output_si=true)  # #/m³
+    p = AtmosphericModels.nrlmsise00.(jd, h, g_lat, g_lon)  # #/m³
     
-    f107 = get_space_index(F10(), jd)
+    f107 = space_index(Val(:F10adj), jd)
     nearest_f107 = FIRI.values(:f10_7)[argmin(abs.(f107 .- FIRI.values(:f10_7)))]
 
     Ne0 = firi(sza, lat; f10_7=nearest_f107, month=month(dt))
@@ -305,10 +300,10 @@ function neutralprofiles(lat, lon, z, dt::DateTime; datafilepath=nothing)
     df = Table(
         h  = collect(z*1.0),  # convert to Float64 for maximum type stability of Table
         Ne = Ne,
-        Tn = [p[i].T_alt for i in eachindex(p)],
-        O  = [p[i].den_O for i in eachindex(p)],
-        N2 = [p[i].den_N2 for i in eachindex(p)],
-        O2 = [p[i].den_O2 for i in eachindex(p)]
+        Tn = [p[i].temperature for i in eachindex(p)],
+        O  = [p[i].O_number_density for i in eachindex(p)],
+        N2 = [p[i].N2_number_density for i in eachindex(p)],
+        O2 = [p[i].O2_number_density for i in eachindex(p)]
     )
 
     # Sometimes a single (or maybe more?) height has NaN in MSIS. Not sure why...
@@ -340,15 +335,12 @@ function neutralprofiles(lat, lon, z, dt::DateTime; datafilepath=nothing)
 end
 
 """
-    chargeprofiles(flux, lat, lon, ee, z, dt::DateTime; t=1e7, datafilepath=nothing) → (background_profiles, perturbed_profiles)
+    chargeprofiles(flux, lat, lon, ee, z, dt::DateTime; t=1e7) → (background_profiles, perturbed_profiles)
     chargeprofiles(flux, ee, neutraltable, z, daytime::Bool; t=1e7)
 
 Compute GPI background and EPP-perturbed profiles for precipitating electron `flux` in
 el/cm²/s, `lat` and `lon` in degrees, heights `z` in kilometers, and time `dt` for
 `EnergeticElectrons` specified by `ee`.
-
-`datafilepath` is an optional directory pointing to wdc and fluxtable files. See
-    documentation for `SatelliteToolbox.init_space_indices`.
 """
 function chargeprofiles(flux, ee, neutraltable, z, daytime::Bool; t=1e7)
     if iszero(flux)
@@ -369,19 +361,16 @@ function chargeprofiles(flux, ee, neutraltable, z, daytime::Bool; t=1e7)
     return Nspec0, Nspec
 end
 
-function chargeprofiles(flux, lat, lon, ee, z, dt::DateTime; t=1e7, datafilepath=nothing)
-    neutraltable = neutralprofiles(lat, lon, z, dt; datafilepath)
+function chargeprofiles(flux, lat, lon, ee, z, dt::DateTime; t=1e7)
+    neutraltable = neutralprofiles(lat, lon, z, dt)
     chargeprofiles(flux, ee, neutraltable, z, isday(zenithangle(lat, lon, dt)); t)
 end
 
 """
-    chargeprofiles(lat, lon, z, dt::DateTime; t=1e7, datafilepath=nothing) → background_profile
+    chargeprofiles(lat, lon, z, dt::DateTime; t=1e7) → background_profile
     chargeprofiles(neutraltable, z, daytime::Bool; t=1e7)
 
 Return the unperturbed (zero flux) GPI background profiles only.
-
-`datafilepath` is an optional directory pointing to wdc and fluxtable files. See
-    documentation for `SatelliteToolbox.init_space_indices`.
 """
 function chargeprofiles(neutraltable, z, daytime::Bool; t=1e7)
     Nspec0, _ = equilibrium(neutraltable, z, daytime; t)
@@ -389,8 +378,8 @@ function chargeprofiles(neutraltable, z, daytime::Bool; t=1e7)
     return Nspec0
 end
 
-function chargeprofiles(lat, lon, z, dt::DateTime; t=1e7, datafilepath=nothing)
-    neutraltable = neutralprofiles(lat, lon, z, dt; datafilepath)
+function chargeprofiles(lat, lon, z, dt::DateTime; t=1e7)
+    neutraltable = neutralprofiles(lat, lon, z, dt)
     chargeprofiles(neutraltable, z, isday(zenithangle(lat, lon, dt)); t)
 end
     

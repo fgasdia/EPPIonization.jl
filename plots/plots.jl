@@ -51,7 +51,7 @@ function ionizationrateplot()
     zstepped = first(z):last(z)
     md = massdensity.((np,), zstepped)  # g/cm³
 
-    S = ionizationprofile(z, energy, energydis, pitchangle, pitchdis, md/1000)*1e6
+    S = ionizationprofile(energy, energydis, pitchangle, pitchdis, md/1000, z)*1e6
     S *= flux
     
     plot(S, z,
@@ -70,8 +70,14 @@ function chargeprofileplot(daytime::Bool)
         dt = DateTime(2020, 3, 1, 8)
     end
 
+    energy = 90e3:1e4:2.2e6  # eV; 90 keV to 2.2 MeV
+    energydis = exp.(-energy/2e5)  # f(E) ∝ exp(-E/β) where β ranges from 100 to 300 keV
+    pitchangle = 0:90
+    pitchdis = ones(length(pitchangle))
+
+    ee = EnergeticElectrons(energy, energydis, pitchangle, pitchdis)
     np = neutralprofiles(lat, lon, z, dt)
-    cp0, cp = chargeprofiles(flux, np, z, daytime)
+    cp0, cp = chargeprofiles(flux, ee, np, z, daytime)
 
     lws = fill(1.2, (1, length(SPECIES)))
     lws[1] = 2  # Ne
@@ -99,8 +105,15 @@ function fineprofileplot(daytime::Bool)
         dt = DateTime(2020, 1, 1, 2, 30)
     end
 
-    cp0, cp = chargeprofiles(flux, lat, lon, z, dt)
-    cp0f, cpf = chargeprofiles(flux, lat, lon, zfine, dt)
+    energy = 90e3:1e4:2.2e6  # eV; 90 keV to 2.2 MeV
+    energydis = exp.(-energy/2e5)  # f(E) ∝ exp(-E/β) where β ranges from 100 to 300 keV
+    pitchangle = 0:90
+    pitchdis = ones(length(pitchangle))
+
+    ee = EnergeticElectrons(energy, energydis, pitchangle, pitchdis)
+
+    cp0, cp = chargeprofiles(flux, lat, lon, ee, z, dt)
+    cp0f, cpf = chargeprofiles(flux, lat, lon, ee, zfine, dt)
 
     lws = fill(1.2, (1, length(SPECIES)))
     lws[1] = 2  # Ne
@@ -117,7 +130,6 @@ end
 
 function relaxationplot(daytime::Bool)
     z = 0:110
-    zfine = 0:0.25:110
     lat, lon = 60, 258
     flux = 1e5
 
@@ -129,10 +141,17 @@ function relaxationplot(daytime::Bool)
 
     ts = exp10.(1:8)
 
+    energy = 90e3:1e4:2.2e6  # eV; 90 keV to 2.2 MeV
+    energydis = exp.(-energy/2e5)  # f(E) ∝ exp(-E/β) where β ranges from 100 to 300 keV
+    pitchangle = 0:90
+    pitchdis = ones(length(pitchangle))
+
+    ee = EnergeticElectrons(energy, energydis, pitchangle, pitchdis)
+
     Nes = Matrix{Float64}(undef, length(z), length(ts))
     Ne0s = similar(Nes)
     for i in eachindex(ts)
-        Nspec0, Nspec = chargeprofiles(flux, lat, lon, z, dt; t=ts[i])
+        Nspec0, Nspec = chargeprofiles(flux, lat, lon, ee, z, dt; t=ts[i])
         Nes[:,i] = Nspec[:,1]
         Ne0s[:,i] = Nspec0[:,1]
     end
